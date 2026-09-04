@@ -1,0 +1,177 @@
+name: Android → Play production
+
+# Every push to main that touches the app ships a signed .aab straight to the
+# Play **production** track at a full 100% rollout (status: completed). There is
+# no staged rollout and no internal/beta hop — that is deliberate, and it is why
+# the workflow refuses to run twice at once and bumps versionCode itself.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'distribution/**'
+      - '.github/workflows/android-release.yml'
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: "What's new (max 500 chars, shown on the Play listing)"
+        required: false
+        default: 'Bug fixes and performance improvements.'
+
+# Two publishes racing each other would both bump to the same versionCode and
+# the second upload would be rejected by Play. Queue instead of cancelling —
+# a cancelled run could leave a half-committed version bump.
+concurrency:
+  group: play-production
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build bundle · roll out 100%
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and test
+        run: |
+          npm run typecheck
+          npm test
+
+      # Play rejects a versionCode it has already seen, so the build is what
+      # decides the next one. It is committed back to main only after the
+      # upload succeeds (see the last step) — a failed build burns nothing.
+      - name: Bump versionCode
+        id: version
+        run: node scripts/ci-bump-version.js
+
+      # EXPO_PUBLIC_* vars are inlined into the JS bundle at build time, so they
+      # have to exist before gradle runs. Written via env: rather than
+      # interpolated into the script so a value can never be read as shell.
+      - name: Write app/.env
+        env:
+          EXPO_PUBLIC_SERVER_URL: ${{ secrets.EXPO_PUBLIC_SERVER_URL }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+          EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID }}
+        run: |
+          {
+            echo "EXPO_PUBLIC_SERVER_URL=$EXPO_PUBLIC_SERVER_URL"
+            echo "EXPO_PUBLIC_SUPABASE_URL=$EXPO_PUBLIC_SUPABASE_URL"
+            echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$EXPO_PUBLIC_SUPABASE_ANON_KEY"
+            echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID"
+            echo "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=$EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID"
+          } > .env
+          test -s .env
+          echo "EXPO_PUBLIC_SERVER_URL is $( [ -n "$EXPO_PUBLIC_SERVER_URL" ] && echo set || echo EMPTY )"
+
+      # withReleaseSigning.js reads android/keystore.properties; without it the
+      # release build silently falls back to the debug key and Play rejects it.
+      - name: Restore upload keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set — the build would be debug-signed and Play would reject it."
+            exit 1
+          fi
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/upload-keystore.jks
+          {
+            echo "storeFile=upload-keystore.jks"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > android/keystore.properties
+          keytool -list -keystore android/upload-keystore.jks \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" > /dev/null
+
+      - name: Build release bundle
+        working-directory: app/android
+        run: ./gradlew :app:bundleRelease --no-daemon --stacktrace
+
+      - name: Verify the bundle is release-signed
+        run: |
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          ls -l "$AAB"
+          # A debug-signed artifact carries the well-known androiddebugkey alias.
+          if unzip -l "$AAB" | grep -qi 'META-INF/ANDROIDD'; then
+            echo "::error::bundle appears to be debug-signed"
+            exit 1
+          fi
+
+      - name: Release notes
+        working-directory: .
+        env:
+          NOTES: ${{ github.event.inputs.release_notes }}
+        run: |
+          mkdir -p distribution/whatsnew
+          if [ -n "$NOTES" ]; then
+            printf '%s\n' "$NOTES" | cut -c1-500 > distribution/whatsnew/whatsnew-en-US
+          fi
+          cat distribution/whatsnew/whatsnew-en-US
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ steps.version.outputs.version_code }}.aab
+          path: app/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      # status: completed IS the 100% rollout. (A staged rollout would be
+      # status: inProgress + userFraction; Play does not accept userFraction 1.0.)
+      - name: Publish to Play production at 100%
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.neukaps.snakeparty
+          releaseFiles: app/android/app/build/outputs/bundle/release/app-release.aab
+          track: production
+          status: completed
+          releaseName: ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }})
+          whatsNewDirectory: distribution/whatsnew
+          changesNotSentForReview: false
+
+      - name: Record the shipped versionCode on main
+        if: success() && github.ref == 'refs/heads/main'
+        working-directory: .
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/app.json app/android/app/build.gradle distribution/whatsnew
+          git diff --cached --quiet && exit 0
+          # [skip ci] — this push must not re-trigger the workflow.
+          git commit -m "release: versionCode ${{ steps.version.outputs.version_code }} to production [skip ci]"
+          git tag -f "android-v${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.version_code }}"
+          git push origin HEAD:main --follow-tags
+
+      - name: Shred signing material
+        if: always()
+        run: rm -f android/upload-keystore.jks android/keystore.properties .env

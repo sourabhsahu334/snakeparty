@@ -1,0 +1,45 @@
+{
+  "name": "snake-app",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/prediction.test.js .test-build/skins.test.js .test-build/slither.test.js .test-build/tiers.test.js .test-build/soloGame.test.js .test-build/soloSettings.test.js",
+    "gen:skins": "node scripts/gen-skins.js",
+    "gen:store": "node scripts/gen-store-assets.js",
+    "art:palette": "node scripts/sample-art-palette.js"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-google-signin/google-signin": "^16.1.4",
+    "@shopify/react-native-skia": "2.2.12",
+    "@supabase/supabase-js": "^2.45.4",
+    "expo": "~54.0.37",
+    "expo-asset": "~12.0.13",
+    "expo-audio": "~1.1.1",
+    "expo-build-properties": "~1.0.10",
+    "expo-clipboard": "~8.0.8",
+    "expo-crypto": "~15.0.9",
+    "expo-status-bar": "~3.0.9",
+    "expo-system-ui": "~6.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-url-polyfill": "^2.0.0",
+    "react-native-worklets": "0.5.1",
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@types/react": "~19.1.10",
+    "babel-preset-expo": "~54.0.12",
+    "pngjs": "^3.4.0",
+    "typescript": "~5.9.2"
+  }
+}

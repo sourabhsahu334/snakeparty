@@ -1,0 +1,7 @@
+node_modules/
+.env
+.expo/
+dist/
+.test-build/
+*.log
+.DS_Store

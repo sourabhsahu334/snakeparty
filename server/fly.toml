@@ -1,0 +1,46 @@
+# fly.toml — always-on game server.
+#
+#   fly launch --no-deploy --copy-config
+#   fly secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+#   fly deploy
+#
+app = "snake-game-server"
+primary_region = "iad"
+
+[build]
+
+[env]
+  PORT = "3001"
+  HOST = "0.0.0.0"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+
+  # THE IMPORTANT PART. Rooms live in this process's memory and clients hold
+  # open websockets, so the machine must never scale to zero or get replaced
+  # mid-round. Leave these exactly as they are.
+  auto_stop_machines = 'off'
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 300
+    hard_limit = 400
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    path = "/health"
+    timeout = "2s"
+
+# Single machine on purpose: rooms are in-memory and there is no cross-instance
+# routing, so a second machine would strand players in different copies of the
+# same room code. Horizontal scaling is an explicit non-goal for the MVP.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

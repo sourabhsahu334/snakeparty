@@ -1,0 +1,27 @@
+{
+  "name": "snake-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Authoritative real-time game server for multiplayer Snake",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test test/*.test.js",
+    "test:clients": "node test/twoClients.js",
+    "test:cheat": "node test/cheatClient.js",
+    "test:reconnect": "node test/reconnect.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.4.5",
+    "nanoid": "^3.3.7",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.7.5"
+  }
+}

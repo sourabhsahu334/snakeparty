@@ -1,0 +1,33 @@
+# Runs on the OCI Ampere box. Caddy terminates TLS and proxies to the game
+# server; the game server itself is never exposed directly on 443.
+services:
+  server:
+    build: ..
+    restart: always
+    environment:
+      PORT: "3001"
+      HOST: "0.0.0.0"
+      CORS_ORIGIN: "${CORS_ORIGIN:-*}"
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY}"
+    expose:
+      - "3001"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    depends_on:
+      - server
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      SERVER_DOMAIN: "${SERVER_DOMAIN}"
+
+volumes:
+  caddy_data:
+  caddy_config:

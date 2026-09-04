@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Snake Party",
+    "slug": "snake-party",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "userInterfaceStyle": "dark",
+    "scheme": "snakeparty",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "backgroundColor": "#070c16",
+    "splash": {
+      "backgroundColor": "#070c16",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.neukaps.snakeparty"
+    },
+    "android": {
+      "package": "com.neukaps.snakeparty",
+      "versionCode": 3,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundImage": "./assets/adaptive-icon-background.png",
+        "backgroundColor": "#7FCFE2"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-asset",
+      "./plugins/withGradleNetworkTimeouts",
+      "./plugins/withReleaseSigning",
+      "expo-audio"
+    ]
+  }
+}

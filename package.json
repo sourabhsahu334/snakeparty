@@ -1,0 +1,14 @@
+{
+  "name": "snake-game",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Real-time multiplayer Snake for private friend lobbies",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix app install",
+    "server": "npm --prefix server run dev",
+    "app": "npm --prefix app start",
+    "test": "npm --prefix server test && npm --prefix app test",
+    "test:e2e": "npm --prefix server run test:clients && npm --prefix server run test:reconnect && npm --prefix server run test:cheat",
+    "typecheck": "npm --prefix app run typecheck"
+  }
+}

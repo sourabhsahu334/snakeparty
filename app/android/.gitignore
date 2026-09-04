@@ -1,0 +1,24 @@
+# OSX
+#
+.DS_Store
+
+# Android/IntelliJ
+#
+build/
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+.cxx/
+
+# Bundle artifacts
+*.jsbundle
+
+# Signing material — never commit. CI injects these from GitHub secrets
+# (see .github/workflows/android-release.yml).
+keystore.properties
+*.jks
+
+# Kotlin incremental-compile scratch
+.kotlin/

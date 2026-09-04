@@ -1,0 +1,6 @@
+# Automatic Let's Encrypt TLS. Websockets are proxied transparently by Caddy,
+# so socket.io upgrades work with no extra config.
+{$SERVER_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy server:3001
+}

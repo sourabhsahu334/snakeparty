@@ -1,0 +1,55 @@
+==================================================
+SHORT DESCRIPTION  (Play Store limit: 80 characters)
+==================================================
+
+Grow, boost, outlast. Real-time snake arena for you and four friends.
+
+--- alternates ---
+Real-time multiplayer snake. Private rooms, 30 skins, one survivor.
+Slither, boost, and outlast your friends in a private 5-player arena.
+Multiplayer snake for private friend lobbies. Share a code, last one wins.
+
+
+==================================================
+FULL DESCRIPTION  (Play Store limit: 4000 characters)
+==================================================
+
+Snake Party is a real-time multiplayer snake arena built for playing with people you actually know.
+
+One person creates a room, shares a five-character code, and up to five of you drop into the same arena. Eat pellets to grow. Boost to cut someone off. Survive when they try the same to you. Run into anyone's body and you burst into pellets for everyone else to feast on. Last snake moving wins the round.
+
+PLAY WITH FRIENDS, NOT STRANGERS
+There is no public matchmaking and no lobby full of strangers. Rooms are private and code-only, so the arena has exactly the people you invited in it. No account is required to join — type a name and you are in.
+
+A REAL ARENA, NOT A GRID
+Snake Party runs on a continuous circular world. Steer with a thumb joystick at any angle, hold boost to burn score for speed, and learn the turn radius that comes with being enormous. The arena rim is lethal, so the edge is a weapon as much as a wall.
+
+BUILT TO FEEL INSTANT
+The server is authoritative — it alone decides where every snake is, so nobody can cheat their position or their score. But your device predicts your own movement the moment you steer, so turns land under your thumb instead of a network round trip later. Corrections glide in rather than snapping.
+
+SOLO MODE, TUNED YOUR WAY
+No friends free? Play offline against bots and set the rules yourself: speed from Chill to Insane, population from Just You to Swarm, arena from Tight to Wide, and food from Sparse to Feast. It runs entirely on your device — no connection needed.
+
+30 SKINS
+Dress your snake in Ember, Tiger, Panda, Galaxy, Rainbow, Ronin, Kitsune, Mech and more. Every skin is free and unlocked from the start. There is nothing to buy.
+
+KEEP SCORE
+Sign in and your results follow you: match history for every round you played and a leaderboard across your own friend group — not a global ladder full of people you will never meet.
+
+DROPPED YOUR CONNECTION?
+Your seat is held for fifteen seconds and your snake stays on autopilot. Reconnect and you are back in the same round, in the same body.
+
+WHAT'S IN IT
+• 1–5 players per private room, plus bots to fill out the arena
+• Five-character room codes — share them any way you like
+• Joystick steering with a boost pad, designed for landscape
+• 30 snake skins and four base colours
+• Offline solo mode with adjustable speed, crowd, arena size and food
+• Match history and a friends-only leaderboard
+• 15-second reconnect grace — a dropped call does not end your run
+• Server-authoritative play: no position, score, or win can be forged
+
+WHAT'S NOT IN IT
+No ads. No in-app purchases. No energy timers, no loot boxes, no daily login streaks. No trackers or analytics SDKs, and the only Android permission the app requests is internet access, because the game is played over a network.
+
+Snake Party needs a network connection for multiplayer rooms. Solo mode works offline.
