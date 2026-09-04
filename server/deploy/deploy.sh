@@ -45,11 +45,36 @@ REMOTE_ENV
 echo "==> building and starting"
 ssh -i "$KEY" "$REMOTE" 'cd ~/snake/deploy && sudo docker compose up -d --build'
 
-echo "==> installing the nightly backup cron (idempotent)"
-ssh -i "$KEY" "$REMOTE" '
+echo "==> installing the nightly backup timer (idempotent)"
+# A systemd timer rather than cron: this Ubuntu image ships without the cron
+# package, and systemd is already there. Same 03:15 schedule, and it survives a
+# reboot without an fstab-style edit.
+ssh -i "$KEY" "$REMOTE" 'set -e
   chmod +x ~/snake/deploy/backup.sh
-  crontab -l 2>/dev/null | grep -q snake/deploy/backup.sh ||
-    (crontab -l 2>/dev/null; echo "15 3 * * * ~/snake/deploy/backup.sh >> ~/snake-backup.log 2>&1") | crontab -
+  sudo tee /etc/systemd/system/snake-backup.service >/dev/null <<UNIT
+[Unit]
+Description=Nightly pg_dump of the snake database
+After=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/home/ubuntu/snake/deploy/backup.sh
+UNIT
+  sudo tee /etc/systemd/system/snake-backup.timer >/dev/null <<UNIT
+[Unit]
+Description=Run the snake database backup nightly
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now snake-backup.timer
+  systemctl list-timers snake-backup.timer --no-pager | head -2
 '
 
 echo "==> health check"

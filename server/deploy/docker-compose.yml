@@ -8,6 +8,20 @@ services:
   db:
     image: postgres:16-alpine
     restart: always
+    # The box is a 1GB OCI micro instance, not the 24GB Ampere the README once
+    # implied. Postgres' defaults assume far more, so it is tuned down here
+    # rather than being left to discover the OOM killer at 2am — and capped
+    # below, so if it ever does misbehave it cannot take the game server with
+    # it. max_connections comfortably exceeds PG_POOL_MAX (10).
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c effective_cache_size=192MB
+      -c maintenance_work_mem=32MB
+      -c work_mem=2MB
+      -c max_connections=20
+      -c wal_compression=on
+    mem_limit: 320m
     environment:
       POSTGRES_USER: "snake"
       POSTGRES_DB: "snake"
@@ -23,6 +37,7 @@ services:
   server:
     build: ..
     restart: always
+    mem_limit: 256m
     # The server applies db/schema.sql on boot, so it must not start against a
     # database that is still initialising.
     depends_on:
@@ -43,6 +58,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: always
+    mem_limit: 96m
     depends_on:
       - server
     ports:
