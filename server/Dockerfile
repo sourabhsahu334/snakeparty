@@ -10,6 +10,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY src ./src
+# db/schema.sql is read by db.migrate() on boot.
+COPY db ./db
 
 # Drop privileges.
 USER node

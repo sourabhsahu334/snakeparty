@@ -7,7 +7,11 @@ const { Server } = require('socket.io');
 
 const C = require('./config');
 const RoomManager = require('./RoomManager');
-const { verifyToken, recordMatch, enabled: supabaseEnabled } = require('./supabaseClient');
+const db = require('./db');
+const auth = require('./auth');
+const credits = require('./credits');
+const { recordMatch } = require('./matches');
+const httpApi = require('./httpApi');
 
 const PORT = Number(process.env.PORT || 3001);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -15,20 +19,18 @@ const HOST = process.env.HOST || '0.0.0.0';
 // ------------------------------------------------------------------ http shell
 
 const httpServer = http.createServer((req, res) => {
-  if (req.url === '/health' || req.url === '/') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(
-      JSON.stringify({
-        ok: true,
-        rooms: manager ? manager.size : 0,
-        supabase: supabaseEnabled,
-        uptime: Math.round(process.uptime()),
-      })
-    );
-    return;
-  }
-  res.writeHead(404);
-  res.end();
+  httpApi
+    .handle(req, res, { rooms: () => (manager ? manager.size : 0) })
+    .then((handled) => {
+      if (handled) return;
+      res.writeHead(404);
+      res.end();
+    })
+    .catch((err) => {
+      console.error('[http] unhandled:', err.message);
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    });
 });
 
 const io = new Server(httpServer, {
@@ -57,21 +59,37 @@ const manager = new RoomManager({
 // --------------------------------------------------------------- handshake
 
 io.use(async (socket, next) => {
-  const auth = socket.handshake.auth || {};
-  const clientId = typeof auth.clientId === 'string' ? auth.clientId.slice(0, 64) : null;
+  const handshake = socket.handshake.auth || {};
+  const clientId = typeof handshake.clientId === 'string' ? handshake.clientId.slice(0, 64) : null;
   if (!clientId) return next(new Error('MISSING_CLIENT_ID'));
 
-  const user = await verifyToken(auth.accessToken);
+  const user = auth.verifyToken(handshake.accessToken);
 
   socket.data.clientId = clientId;
   socket.data.userId = user ? user.id : null;
   socket.data.username = sanitizeName(
-    (user && user.username) || auth.username || `Guest-${clientId.slice(0, 4)}`
+    (user && user.username) || handshake.username || `Guest-${clientId.slice(0, 4)}`
   );
-  socket.data.colorIndex = Number.isInteger(auth.colorIndex) ? auth.colorIndex : undefined;
-  socket.data.skinIndex = Number.isInteger(auth.skinIndex) ? auth.skinIndex : undefined;
+  socket.data.colorIndex = Number.isInteger(handshake.colorIndex) ? handshake.colorIndex : undefined;
+  socket.data.skinIndex = Number.isInteger(handshake.skinIndex) ? handshake.skinIndex : undefined;
   next();
 });
+
+/**
+ * The player row this socket spends credits against.
+ *
+ * A signed-in client already carries our JWT, so its id came out of the
+ * handshake. A client that never called /auth/guest gets a row created on the
+ * spot, keyed on its install id — the same row it would have got by signing in,
+ * so credits survive a restart either way.
+ */
+async function ensurePlayerId(socket) {
+  if (socket.data.userId) return socket.data.userId;
+  if (!socket.data.clientId) return null;
+  const player = await auth.signInGuest(socket.data.clientId, socket.data.username);
+  socket.data.userId = player ? player.id : null;
+  return socket.data.userId;
+}
 
 function sanitizeName(name) {
   return String(name).replace(/[^\w \-]/g, '').trim().slice(0, 20) || 'Player';
@@ -103,17 +121,48 @@ function ack(cb, payload) {
 io.on('connection', (socket) => {
   console.log(`[conn] ${socket.id} (${socket.data.username})`);
 
-  socket.on('create_room', (payload, cb) => {
+  socket.on('create_room', async (payload, cb) => {
     const existing = manager.roomForSocket(socket.id);
     if (existing) return ack(cb, { ok: false, error: 'ALREADY_IN_ROOM' });
     applyLook(socket, payload);
 
-    const room = manager.createRoom({ hostClientId: socket.data.clientId });
+    // Hosting costs one of the day's free rooms; joining one costs nothing.
+    // The player row is materialised here rather than in the handshake so an
+    // ordinary connection stays database-free — but it does have to happen
+    // before the spend, or a client that simply never called /auth/guest would
+    // have no counter to charge and would host unlimited rooms.
+    const playerId = await ensurePlayerId(socket);
+    const spent = await credits.spend(playerId);
+    if (!spent.ok) {
+      return ack(cb, {
+        ok: false,
+        error: 'NO_ROOM_CREDITS',
+        credits: { remaining: 0, perDay: credits.PER_DAY, resetsAt: spent.resetsAt },
+      });
+    }
+
+    let room;
+    try {
+      room = manager.createRoom({ hostClientId: socket.data.clientId });
+    } catch (err) {
+      // Never charge for a room that does not exist.
+      await credits.refund(playerId);
+      throw err;
+    }
     const player = room.addPlayer(socket.id, identityOf(socket));
     socket.join(room.code);
 
-    console.log(`[room ${room.code}] created by ${socket.data.username}`);
-    ack(cb, { ok: true, code: room.code, you: publicSelf(player), lobby: room.lobbyState() });
+    console.log(
+      `[room ${room.code}] created by ${socket.data.username} ` +
+        `(${spent.remaining}/${credits.PER_DAY} rooms left today)`
+    );
+    ack(cb, {
+      ok: true,
+      code: room.code,
+      you: publicSelf(player),
+      lobby: room.lobbyState(),
+      credits: { remaining: spent.remaining, perDay: credits.PER_DAY },
+    });
     io.to(room.code).emit('lobby_state', room.lobbyState());
   });
 
@@ -264,6 +313,10 @@ function publicSelf(player) {
 }
 
 // ------------------------------------------------------------------ startup
+
+// Applying the schema on boot means a fresh box needs no manual migration step;
+// every statement is create-if-not-exists, so a restart is a no-op.
+db.migrate().catch((err) => console.error('[db] migrate failed:', err.message));
 
 httpServer.listen(PORT, HOST, () => {
   console.log(

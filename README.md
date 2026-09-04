@@ -7,9 +7,9 @@ die on any collision, last snake standing wins.
 ```
 /snake-game
   /server      Node.js authoritative game server (socket.io, 20Hz fixed tick)
+    /db        schema.sql — players, matches, daily room credits
   /app         React Native (Expo) client — Skia canvas, client-side prediction
-  /supabase    schema.sql — auth, profiles, match history, RLS
-  /docs        setup notes (Google Sign-In)
+  /docs        setup notes (Google Sign-In, CI/CD)
 ```
 
 ---
@@ -26,10 +26,26 @@ or emits its own `game_over` is simply ignored (see `npm run test:cheat`).
 its own `setInterval` loop at 50ms. Nothing touches the database during a round.
 A room is destroyed the moment its last player leaves.
 
-**Supabase is off the hot path entirely.** It is consulted exactly twice: once
-in the socket handshake to check an access token, and once at `game_over` to
-write the result. If Supabase is down or unconfigured the game still plays
-perfectly — you just don't get a saved match history.
+**The database is off the hot path entirely.** Postgres runs beside the game
+server and is consulted three times: once in the socket handshake to check a
+token, once when a room is created to spend a daily credit, and once at
+`game_over` to write the result. If the database is down or unconfigured the
+game still plays perfectly — you just don't get a saved match history, and
+credits stop being enforced.
+
+**Identity is ours.** There is no auth provider. `POST /auth/guest` mints a JWT
+against the install's `clientId`; `POST /auth/google` verifies a Google ID token
+with Google's keys and hands back the same kind of JWT. Signing in with Google
+on a device that was already playing as a guest upgrades that player row in
+place, so history and the day's spent credits follow you into the account
+instead of resetting.
+
+**Two free rooms a day.** Hosting a room costs a credit; joining one is always
+free. That split is the point — a player out of credits can still play all
+evening if a friend hosts, so nobody is locked out of the multiplayer
+experience. The counter resets at midnight IST, and the reset is a date
+comparison inside the same UPDATE that spends the credit, so two taps racing
+each other cannot buy a third room.
 
 **The client predicts, the server corrects.** At 20Hz a snake steps once every
 50ms; waiting a network round trip to see your own turn would feel awful. So the
@@ -62,7 +78,7 @@ net and to catch up anyone who reconnected.
 ```bash
 cd server
 npm install
-cp .env.example .env      # optional — it runs fine without Supabase
+cp .env.example .env      # optional — it runs fine without a database
 npm run dev               # http://localhost:3001
 ```
 
@@ -93,32 +109,47 @@ bundle time.
 > enables via `expo-build-properties`. Requires a dev build (`npx expo run:android`),
 > not Expo Go.
 
-### 3. Supabase (optional)
+### 3. Postgres (optional)
 
-1. Create a project, then enable **Anonymous sign-ins** under Auth → Providers.
-2. Paste `supabase/schema.sql` into the SQL editor and run it.
-3. Server `.env`: `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service role —
-   this key must never end up in the app).
-4. App `.env`: `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+Without it the game runs and credits are unlimited. With it you get match
+history and the daily room limit.
+
+```bash
+docker run -d --name snake-pg -p 5432:5432 \
+  -e POSTGRES_USER=snake -e POSTGRES_PASSWORD=password -e POSTGRES_DB=snake \
+  postgres:16-alpine
+```
+
+Then in `server/.env`:
+
+```
+DATABASE_URL=postgres://snake:password@localhost:5432/snake
+AUTH_JWT_SECRET=$(openssl rand -hex 32)
+```
+
+`db/schema.sql` is applied automatically on boot — every statement is
+create-if-not-exists, so a restart is a no-op and there is no migration step.
 
 ### 4. Google Sign-In (optional)
 
-Guests are anonymous Supabase users; a Google account is what survives a
+Guests are keyed on the install id; a Google account is what survives a
 reinstall and keeps match history attached to the same player. The client IDs,
 fingerprints and dashboard settings are in
 [docs/google-sign-in.md](docs/google-sign-in.md). Unset, the button is hidden and
 nothing else changes.
 
-RLS is read-only for users: you can read matches you played in and nothing else.
-There is deliberately **no insert policy** — only the server's service-role key
-can write results, so a client cannot forge match history.
+There is no row-level security, because there is no longer anything to protect
+against: Postgres has no published port, the app cannot reach it, and every read
+goes through an endpoint that scopes by the caller's JWT. The policy layer
+Supabase needed existed to guard a direct-from-client connection that no longer
+exists.
 
 ---
 
 ## Tests
 
 ```bash
-npm test          # 23 server sim tests + 18 client prediction tests
+npm test          # 62 server tests + 73 client tests
 npm run test:e2e  # real socket clients: two-player, reconnect, then cheating
 npm run typecheck # tsc --noEmit over the whole app
 ```
@@ -133,6 +164,10 @@ npm run typecheck # tsc --noEmit over the whole app
   with a catch-up snapshot, and the seat is released once the grace window ends.
 - **`server/test/cheatClient.js`** — 14 cheat attempts against the live server,
   each followed by an inspection of the authoritative state.
+- **`server/test/credits.test.js`** — daily credits, identity linking and match
+  recording against a real Postgres. PGlite is Postgres compiled to wasm, so
+  `db/schema.sql` and every query run exactly as they will in production rather
+  than against a mock.
 - **`app/src/game/prediction.test.ts`** — prediction, reconciliation, the
   smooth-correct-vs-snap threshold, and frame interpolation, on a fake clock.
 
@@ -148,9 +183,16 @@ Websockets need a connection that stays open, and rooms live in RAM.
 ```bash
 cd server
 fly launch --no-deploy --copy-config
-fly secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+fly secrets set DATABASE_URL=... AUTH_JWT_SECRET=... GOOGLE_WEB_CLIENT_ID=...
 fly deploy
 ```
+
+Fly has no database in `fly.toml`; you would need a Postgres app alongside it.
+The primary deployment is the OCI box — see `server/deploy/`, where
+`docker compose` runs Caddy, the server and Postgres together, and
+`deploy/backup.sh` is installed as a nightly `pg_dump` cron. That backup is the
+entire disaster-recovery story now that Supabase's point-in-time recovery is
+gone; test a restore before you rely on it.
 
 `fly.toml` sets `auto_stop_machines = 'off'` and `min_machines_running = 1`.
 Don't change those — a machine that scales to zero drops every open socket, and
@@ -193,3 +235,10 @@ tick rate in `game_start` rather than hardcoding a copy.
 - JSON over socket.io, not a binary protocol. ~100 bytes/tick is nowhere near
   needing one at this player count.
 - No public matchmaking, ranked play, cosmetics, or spectator mode.
+- The game server and its database share one box, so losing the box loses both.
+  Under Supabase a dead database still left the game playable.
+- Daily credits are per *player row*, and a guest row is keyed on the install
+  id — so uninstalling and reinstalling hands out a fresh two rooms. Signing in
+  with Google closes that door for anyone who does, but guests can still farm
+  it. Tightening it means device attestation, which is a much bigger hammer than
+  a free-tier limit warrants.
