@@ -169,7 +169,11 @@ jobs:
           git diff --cached --quiet && exit 0
           # [skip ci] — this push must not re-trigger the workflow.
           git commit -m "release: versionCode ${{ steps.version.outputs.version_code }} to production [skip ci]"
-          git tag -f "android-v${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.version_code }}"
+          # Annotated (-a), not lightweight: --follow-tags below only pushes
+          # annotated tags, so a lightweight one is created and then silently
+          # left behind on the runner.
+          git tag -f -a "android-v${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.version_code }}" \
+            -m "versionCode ${{ steps.version.outputs.version_code }} to production at 100%"
           git push origin HEAD:main --follow-tags
 
       - name: Shred signing material
