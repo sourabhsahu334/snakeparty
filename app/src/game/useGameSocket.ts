@@ -12,7 +12,7 @@ import { io, type Socket } from 'socket.io-client';
 import { SERVER_URL } from '../lib/env';
 import { getClientId } from '../lib/clientId';
 import { loadLook, saveLook } from '../lib/prefs';
-import { getSession } from '../lib/supabaseClient';
+import { getSession } from '../lib/session';
 import { GameSimulation } from './prediction';
 import { PALETTE } from './palette';
 import { SoloGame } from './soloGame';

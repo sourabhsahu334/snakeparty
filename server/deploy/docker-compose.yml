@@ -1,15 +1,42 @@
 # Runs on the OCI Ampere box. Caddy terminates TLS and proxies to the game
 # server; the game server itself is never exposed directly on 443.
 services:
+  # Postgres replaced Supabase. Note there are no `ports:` — the database is
+  # reachable only from the compose network, so the only thing that can talk to
+  # it is the game server. Nothing on the public internet can reach 5432, which
+  # is what makes it safe to run without the per-row policies Supabase needed.
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: "snake"
+      POSTGRES_DB: "snake"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snake -d snake"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   server:
     build: ..
     restart: always
+    # The server applies db/schema.sql on boot, so it must not start against a
+    # database that is still initialising.
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       PORT: "3001"
       HOST: "0.0.0.0"
       CORS_ORIGIN: "${CORS_ORIGIN:-*}"
-      SUPABASE_URL: "${SUPABASE_URL}"
-      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY}"
+      DATABASE_URL: "postgres://snake:${POSTGRES_PASSWORD}@db:5432/snake"
+      AUTH_JWT_SECRET: "${AUTH_JWT_SECRET:?AUTH_JWT_SECRET is required}"
+      GOOGLE_WEB_CLIENT_ID: "${GOOGLE_WEB_CLIENT_ID:-}"
+      FREE_ROOMS_PER_DAY: "${FREE_ROOMS_PER_DAY:-2}"
+      CREDITS_TIMEZONE: "${CREDITS_TIMEZONE:-Asia/Kolkata}"
     expose:
       - "3001"
 
@@ -29,5 +56,6 @@ services:
       SERVER_DOMAIN: "${SERVER_DOMAIN}"
 
 volumes:
+  pgdata:
   caddy_data:
   caddy_config:

@@ -22,3 +22,8 @@ keystore.properties
 
 # Kotlin incremental-compile scratch
 .kotlin/
+
+# Firebase config. Not used at build time — there is no google-services plugin;
+# the app reads the client ID from EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID. Kept out of
+# the repo so its presence never implies otherwise.
+google-services.json

@@ -25,19 +25,32 @@ echo "==> syncing source"
 ssh -i "$KEY" "$REMOTE" 'mkdir -p ~/snake'
 rsync -az --delete -e "ssh -i $KEY" \
   --exclude node_modules --exclude .env --exclude test \
-  "${SRC}/src" "${SRC}/package.json" "${SRC}/package-lock.json" \
+  "${SRC}/src" "${SRC}/db" "${SRC}/package.json" "${SRC}/package-lock.json" \
   "${SRC}/Dockerfile" "${SRC}/deploy" "$REMOTE:~/snake/"
 
 echo "==> writing remote env"
+: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in server/.env}"
+: "${AUTH_JWT_SECRET:?set AUTH_JWT_SECRET in server/.env (openssl rand -hex 32)}"
+
 ssh -i "$KEY" "$REMOTE" "cat > ~/snake/deploy/.env" <<REMOTE_ENV
 SERVER_DOMAIN=${DOMAIN}
 CORS_ORIGIN=*
-SUPABASE_URL=${SUPABASE_URL}
-SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+AUTH_JWT_SECRET=${AUTH_JWT_SECRET}
+GOOGLE_WEB_CLIENT_ID=${GOOGLE_WEB_CLIENT_ID:-}
+FREE_ROOMS_PER_DAY=${FREE_ROOMS_PER_DAY:-2}
+CREDITS_TIMEZONE=${CREDITS_TIMEZONE:-Asia/Kolkata}
 REMOTE_ENV
 
 echo "==> building and starting"
 ssh -i "$KEY" "$REMOTE" 'cd ~/snake/deploy && sudo docker compose up -d --build'
+
+echo "==> installing the nightly backup cron (idempotent)"
+ssh -i "$KEY" "$REMOTE" '
+  chmod +x ~/snake/deploy/backup.sh
+  crontab -l 2>/dev/null | grep -q snake/deploy/backup.sh ||
+    (crontab -l 2>/dev/null; echo "15 3 * * * ~/snake/deploy/backup.sh >> ~/snake-backup.log 2>&1") | crontab -
+'
 
 echo "==> health check"
 sleep 5

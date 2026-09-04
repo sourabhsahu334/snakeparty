@@ -11,7 +11,7 @@ import { GOOGLE_ENABLED, GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from './en
 type GoogleModule = typeof import('@react-native-google-signin/google-signin');
 
 export type GoogleCredential = {
-  /** The JWT Supabase exchanges for a session. */
+  /** The JWT the game server verifies and exchanges for a session. */
   idToken: string;
   name: string | null;
   email: string | null;
@@ -41,7 +41,7 @@ export const googleAvailable = () => GOOGLE_ENABLED && load() !== null;
 function configure(mod: GoogleModule) {
   if (configured) return;
   mod.GoogleSignin.configure({
-    // Supabase checks the token's audience against this one, on both platforms.
+    // The server checks the token's audience against this one, on both platforms.
     webClientId: GOOGLE_WEB_CLIENT_ID,
     iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
     scopes: ['profile', 'email'],
@@ -113,6 +113,6 @@ export async function signOutFromGoogle() {
   try {
     await mod.GoogleSignin.signOut();
   } catch {
-    // Never block the Supabase sign-out on this.
+    // Never block signing out on this.
   }
 }

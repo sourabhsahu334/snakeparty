@@ -22,7 +22,7 @@ import {
   type SoloSettings,
 } from '../game/soloSettings';
 import { loadSoloSettings, saveSoloSettings } from '../lib/prefs';
-import { SERVER_URL, SUPABASE_ENABLED } from '../lib/env';
+import { SERVER_URL } from '../lib/env';
 import {
   getSession,
   setUsername as saveUsername,
@@ -30,7 +30,7 @@ import {
   signInWithGoogleAccount,
   signOut,
   type Session,
-} from '../lib/supabaseClient';
+} from '../lib/session';
 import { googleAvailable } from '../lib/google';
 import { theme, ui } from '../lib/theme';
 
@@ -84,12 +84,14 @@ export function HomeScreen() {
 
   const ensureIdentity = useCallback(async () => {
     const name = username.trim() || 'Player';
-    if (SUPABASE_ENABLED && !session) {
+    // Everyone gets an identity now, guest or not: it is what the daily room
+    // credits are counted against, so there is nothing to gate this on.
+    if (!session) {
       const s = await signInAnonymously(name);
       if (s) setSession(s);
-    } else if (SUPABASE_ENABLED && session && session.username !== name) {
-      await saveUsername(name);
-      setSession({ ...session, username: name });
+    } else if (session.username !== name) {
+      const renamed = await saveUsername(name);
+      setSession(renamed ?? { ...session, username: name });
     }
     await game.reauthenticate(name);
   }, [game, session, username]);
@@ -346,7 +348,7 @@ export function HomeScreen() {
               ) : (
                 <Text numberOfLines={1} style={styles.server}>
                   {SERVER_URL.replace(/^https?:\/\//, '')}
-                  {SUPABASE_ENABLED && session ? ' · history on' : ' · guest'}
+                  {session && !session.isGuest ? ' · history on' : ' · guest'}
                 </Text>
               )}
             </>
