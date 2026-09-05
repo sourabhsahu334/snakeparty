@@ -185,6 +185,9 @@ export function HomeScreen() {
     if (!res.ok) setLocalError(errorText(res.error));
   }, [code, ensureIdentity, game]);
 
+  // The server gates rooms on a linked account; mirror it here so a guest is
+  // offered sign-in rather than a button that will be refused.
+  const needsAccount = GOOGLE_ON && (!session || session.isGuest);
   const online = game.conn === 'online';
   const blocked = !online || busy !== null;
 
@@ -307,6 +310,30 @@ export function HomeScreen() {
                 </Text>
               </View>
 
+              {needsAccount ? (
+                /* Multiplayer needs a real account — the server refuses guests
+                   either way, so showing the buttons would only produce an
+                   error. Solo is unaffected and stays one tap away. */
+                <View style={styles.gateCard}>
+                  <Text style={styles.gateTitle}>Sign in to play multiplayer</Text>
+                  <Text style={styles.gateBody}>
+                    Rooms are tied to your Google account, so your name, history and daily
+                    rooms follow you to any device. Single player needs no account.
+                  </Text>
+                  <Pressable
+                    onPress={onGoogle}
+                    disabled={authBusy}
+                    style={[ui.button, authBusy && ui.disabled]}
+                  >
+                    {authBusy ? (
+                      <ActivityIndicator color={theme.ink} size="small" />
+                    ) : (
+                      <Text style={styles.buttonText}>SIGN IN WITH GOOGLE</Text>
+                    )}
+                  </Pressable>
+                </View>
+              ) : (
+                <>
               <Pressable
                 onPress={onCreate}
                 disabled={blocked}
@@ -367,6 +394,9 @@ export function HomeScreen() {
                   )}
                 </Pressable>
               </View>
+
+                </>
+              )}
 
               {localError || game.error ? (
                 <Text numberOfLines={3} style={[ui.error, styles.errorText]}>
@@ -615,5 +645,22 @@ const styles = StyleSheet.create({
   creditsOut: {
     color: theme.danger,
     opacity: 1,
+  },
+  gateCard: {
+    gap: 10,
+  },
+  gateTitle: {
+    color: theme.ink,
+    fontSize: 15,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  gateBody: {
+    color: theme.ink,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
+    opacity: 0.8,
+    textAlign: 'center',
   },
 });

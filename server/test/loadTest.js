@@ -8,8 +8,7 @@
  */
 
 process.env.PORT = process.env.PORT || '3995';
-process.env.SUPABASE_URL = '';
-process.env.SUPABASE_SERVICE_ROLE_KEY = '';
+process.env.REQUIRE_ACCOUNT_FOR_ROOMS = 'false';
 
 const CLIENTS = Number(process.argv[2] || 50);
 const SECONDS = Number(process.argv[3] || 30);

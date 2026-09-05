@@ -53,3 +53,11 @@ test('NO_ROOM_CREDITS has a static fallback for callers without the balance', ()
   assert.match(text, /still join/);
   assert.notEqual(text, 'Something went wrong. Try again.');
 });
+
+test('the multiplayer gate tells a guest that solo still works', () => {
+  const text = errorText('GOOGLE_REQUIRED');
+  assert.match(text, /Sign in with Google/);
+  // A guest who reads this must not conclude the whole game is locked.
+  assert.match(text, /[Ss]ingle player/);
+  assert.notEqual(text, 'Something went wrong. Try again.');
+});

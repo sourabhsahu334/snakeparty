@@ -98,6 +98,7 @@ async function handle(req, res, ctx) {
       db: db.enabled,
       google: auth.googleEnabled,
       freeRoomsPerDay: credits.PER_DAY,
+      requiresAccount: process.env.REQUIRE_ACCOUNT_FOR_ROOMS !== 'false',
       uptime: Math.round(process.uptime()),
     });
     return true;

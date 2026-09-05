@@ -67,6 +67,10 @@ io.use(async (socket, next) => {
 
   socket.data.clientId = clientId;
   socket.data.userId = user ? user.id : null;
+  // The token says whether this is a real account or a guest. Multiplayer is
+  // gated on it below, so it has to come from the *verified* token and never
+  // from anything the handshake claims.
+  socket.data.isGuest = user ? user.guest !== false : true;
   socket.data.username = sanitizeName(
     (user && user.username) || handshake.username || `Guest-${clientId.slice(0, 4)}`
   );
@@ -74,6 +78,23 @@ io.use(async (socket, next) => {
   socket.data.skinIndex = Number.isInteger(handshake.skinIndex) ? handshake.skinIndex : undefined;
   next();
 });
+
+/**
+ * Multiplayer requires a real account.
+ *
+ * Enforced here rather than only in the app: a modified client can send
+ * whatever it likes, and the server is the only thing that decides who is in a
+ * room. REQUIRE_ACCOUNT_FOR_ROOMS exists so the gate can be lifted without a
+ * redeploy of the client if sign-in ever breaks in the wild — with Google
+ * mandatory, a broken sign-in means nobody can play at all.
+ */
+const REQUIRE_ACCOUNT = process.env.REQUIRE_ACCOUNT_FOR_ROOMS !== 'false';
+
+function accountGate(socket) {
+  if (!REQUIRE_ACCOUNT) return null;
+  if (socket.data.userId && socket.data.isGuest === false) return null;
+  return { ok: false, error: 'GOOGLE_REQUIRED' };
+}
 
 /**
  * The player row this socket spends credits against.
@@ -124,6 +145,9 @@ io.on('connection', (socket) => {
   socket.on('create_room', async (payload, cb) => {
     const existing = manager.roomForSocket(socket.id);
     if (existing) return ack(cb, { ok: false, error: 'ALREADY_IN_ROOM' });
+    // Checked before the credit is spent, so a refused guest is never charged.
+    const gated = accountGate(socket);
+    if (gated) return ack(cb, gated);
     applyLook(socket, payload);
 
     // Hosting costs one of the day's free rooms; joining one costs nothing.
@@ -169,6 +193,8 @@ io.on('connection', (socket) => {
   socket.on('join_room', (payload, cb) => {
     const code = payload && payload.code;
     if (manager.roomForSocket(socket.id)) return ack(cb, { ok: false, error: 'ALREADY_IN_ROOM' });
+    const gated = accountGate(socket);
+    if (gated) return ack(cb, gated);
     applyLook(socket, payload);
 
     const res = manager.joinRoom(code, socket.id, identityOf(socket));

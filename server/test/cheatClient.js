@@ -8,8 +8,9 @@
  */
 
 process.env.PORT = process.env.PORT || '3998';
-process.env.SUPABASE_URL = '';
-process.env.SUPABASE_SERVICE_ROLE_KEY = '';
+// These exercise game mechanics, not sign-in, so they connect as guests and
+// the account gate is off. accountGate.test.js is what proves the gate works.
+process.env.REQUIRE_ACCOUNT_FOR_ROOMS = 'false';
 
 const { io: ioClient } = require('socket.io-client');
 const { httpServer, manager } = require('../src/index');

@@ -13,7 +13,8 @@
     "test": "node --test test/*.test.js",
     "test:clients": "node test/twoClients.js",
     "test:cheat": "node test/cheatClient.js",
-    "test:reconnect": "node test/reconnect.js"
+    "test:reconnect": "node test/reconnect.js",
+    "test:gate": "node test/accountGate.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

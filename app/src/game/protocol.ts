@@ -329,6 +329,7 @@ export function noCreditsText(credits?: Credits): string {
 
 export const ERROR_TEXT: Record<string, string> = {
   NO_ROOM_CREDITS: "You've used today's free rooms. You can still join a friend's room.",
+  GOOGLE_REQUIRED: 'Sign in with Google to play multiplayer. Single player needs no account.',
   ROOM_NOT_FOUND: "That code doesn't match any room.",
   ROOM_FULL: 'That room is already full.',
   ROOM_IN_PROGRESS: 'That game has already started.',
