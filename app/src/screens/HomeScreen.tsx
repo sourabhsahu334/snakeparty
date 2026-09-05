@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PALETTE, useGame } from '../game/useGameSocket';
 import { SkinButton } from '../game/SkinGallery';
 import { SoloSetupSheet } from './SoloSetupSheet';
-import { errorText } from '../game/protocol';
+import { errorText, noCreditsText, timeUntil } from '../game/protocol';
 import {
   DEFAULT_SOLO_SETTINGS,
   describe,
@@ -74,12 +74,18 @@ export function HomeScreen() {
       if (cancelled) return;
       setSession(s);
       setUsername((u) => u || s?.username || `Player${Math.floor(Math.random() * 900 + 100)}`);
+      // A returning player already has a token, so the balance can be shown
+      // before they tap anything — finding out you are out of rooms by being
+      // refused is a worse way to learn it.
+      if (s) void game.refreshCredits();
       const saved = await loadSoloSettings();
       if (!cancelled) setSolo(saved);
     })();
     return () => {
       cancelled = true;
     };
+    // game is a stable hook object; refreshCredits is only read here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const ensureIdentity = useCallback(async () => {
@@ -94,6 +100,8 @@ export function HomeScreen() {
       setSession(renamed ?? { ...session, username: name });
     }
     await game.reauthenticate(name);
+    // Now that there is a token, the balance can be read.
+    void game.refreshCredits();
   }, [game, session, username]);
 
   const onGoogle = useCallback(async () => {
@@ -153,7 +161,15 @@ export function HomeScreen() {
     await ensureIdentity();
     const res = await game.createRoom();
     setBusy(null);
-    if (!res.ok) setLocalError(errorText(res.error));
+    if (res.ok) return;
+    // Out of rooms is not really an error — it is a wait. Say how long, and
+    // say that joining still works, so it does not read as "come back tomorrow".
+    if (res.error === 'NO_ROOM_CREDITS') {
+      const c = (res as { credits?: Parameters<typeof noCreditsText>[0] }).credits;
+      setLocalError(noCreditsText(c ?? game.credits ?? undefined));
+      return;
+    }
+    setLocalError(errorText(res.error));
   }, [ensureIdentity, game]);
 
   const onJoin = useCallback(async () => {
@@ -303,6 +319,17 @@ export function HomeScreen() {
                 )}
               </Pressable>
 
+              {game.credits ? (
+                <Text
+                  numberOfLines={1}
+                  style={[styles.credits, game.credits.remaining === 0 && styles.creditsOut]}
+                >
+                  {game.credits.remaining > 0
+                    ? `${game.credits.remaining} of ${game.credits.perDay} free rooms left today`
+                    : `No rooms left — refills in ${timeUntil(game.credits.resetsAt)}`}
+                </Text>
+              ) : null}
+
               <View style={styles.divider}>
                 <View style={styles.rule} />
                 <Text style={styles.dividerText}>OR JOIN A CODE</Text>
@@ -342,7 +369,7 @@ export function HomeScreen() {
               </View>
 
               {localError || game.error ? (
-                <Text numberOfLines={2} style={[ui.error, styles.errorText]}>
+                <Text numberOfLines={3} style={[ui.error, styles.errorText]}>
                   {localError ?? game.error}
                 </Text>
               ) : (
@@ -574,5 +601,19 @@ const styles = StyleSheet.create({
     opacity: 0.75,
     marginTop: 8,
     textAlign: 'center',
+  },
+  // Sits directly under CREATE ROOM, so it reads as a property of that button
+  // rather than as a warning about the screen.
+  credits: {
+    color: theme.ink,
+    fontSize: 12,
+    fontWeight: '700',
+    opacity: 0.7,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  creditsOut: {
+    color: theme.danger,
+    opacity: 1,
   },
 });

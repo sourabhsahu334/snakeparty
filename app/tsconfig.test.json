@@ -28,6 +28,7 @@
     "src/game/soloGame.ts",
     "src/game/soloGame.test.ts",
     "src/game/soloSettings.ts",
-    "src/game/soloSettings.test.ts"
+    "src/game/soloSettings.test.ts",
+    "src/game/credits.test.ts"
   ]
 }

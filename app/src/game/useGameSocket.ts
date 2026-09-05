@@ -12,7 +12,7 @@ import { io, type Socket } from 'socket.io-client';
 import { SERVER_URL } from '../lib/env';
 import { getClientId } from '../lib/clientId';
 import { loadLook, saveLook } from '../lib/prefs';
-import { getSession } from '../lib/session';
+import { getCredits, getSession } from '../lib/session';
 import { GameSimulation } from './prediction';
 import { PALETTE } from './palette';
 import { SoloGame } from './soloGame';
@@ -23,6 +23,7 @@ import type {
   DeathInfo,
   GameMeta,
   Skin,
+  Credits,
   GameOver,
   JoinAck,
   Leaderboard,
@@ -57,6 +58,10 @@ export type GameSocket = {
   mode: Mode | null;
   error: string | null;
   clearError: () => void;
+
+  /** Today's free room allowance. null until the player has an identity. */
+  credits: Credits | null;
+  refreshCredits: () => Promise<Credits | null>;
 
   roomCode: string | null;
   lobby: LobbyState | null;
@@ -126,6 +131,12 @@ export function useGameSocket(): GameSocket {
   const [paused, setPaused] = useState(false);
   const [soloSettings, setSoloSettings] = useState<SoloSettings>(DEFAULT_SOLO_SETTINGS);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Today's remaining free rooms. Read once on connect and then kept in step
+   * with whatever create_room reports, so the lobby never has to ask again on
+   * the happy path.
+   */
+  const [credits, setCredits] = useState<Credits | null>(null);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [lobby, setLobby] = useState<LobbyState | null>(null);
   const [me, setMe] = useState<Me | null>(null);
@@ -484,10 +495,14 @@ export function useGameSocket(): GameSocket {
   }, []);
 
   const createRoom = useCallback(async () => {
-    const res = await request<JoinAck & Ack>('create_room', {
+    const res = await request<JoinAck & Ack & { credits?: Credits }>('create_room', {
       colorIndex: colorRef.current,
       skinIndex: skinRef.current,
     });
+    // The server reports the balance on both outcomes — spent on success,
+    // and zero-with-a-reset-time on refusal — so this is the one place the
+    // count needs updating.
+    if (res.credits) setCredits(res.credits);
     if (res.ok) {
       setMode('online');
       setRoomBoth(res.code);
@@ -497,6 +512,13 @@ export function useGameSocket(): GameSocket {
     }
     return res;
   }, [request, setMeBoth, setMode, setRoomBoth]);
+
+  /** Ask the server what today's balance is. Safe to call on a cold start. */
+  const refreshCredits = useCallback(async () => {
+    const c = await getCredits();
+    if (c) setCredits(c);
+    return c;
+  }, []);
 
   const joinRoom = useCallback(
     async (code: string) => {
@@ -625,6 +647,8 @@ export function useGameSocket(): GameSocket {
     phase,
     mode,
     error,
+    credits,
+    refreshCredits,
     clearError: () => setError(null),
     roomCode,
     lobby,
