@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 
 import { beadColors, scaleHighlight } from './skins';
+import { LOCAL_SKINS } from './skins.catalog';
 import type { Skin } from './protocol';
 
 const classic: Skin = { id: 'classic', name: 'Classic', desc: '', mode: 'bands', pattern: null, band: 1 };
@@ -22,12 +23,21 @@ test('bands repeat the pattern, `band` beads at a time', () => {
 });
 
 test('a gradient runs head to tail and is quantised for cheap drawing', () => {
-  const c = beadColors(ember, '#000000', 40);
+  // Long enough to have run the full span; the ramp is anchored to the head, so
+  // a snake shorter than the span simply has not reached the last stop yet.
+  const c = beadColors(ember, '#000000', 80);
   assert.strictEqual(c[0], '#ffe066', 'head is the first stop');
   assert.strictEqual(c[c.length - 1], '#c81d11', 'tail is the last stop');
   const distinct = new Set(c).size;
   assert.ok(distinct <= 6, `gradient used ${distinct} colours; should quantise to <= 6 draw calls`);
   assert.ok(distinct > 2, 'but it should actually blend');
+});
+
+test('two skins sharing an id but not a pattern do not share cached colours', () => {
+  const a: Skin = { id: 'dup', name: 'A', desc: '', mode: 'bands', pattern: ['#FF0000'], band: 1 };
+  const b: Skin = { id: 'dup', name: 'B', desc: '', mode: 'bands', pattern: ['#00FF00'], band: 1 };
+  assert.strictEqual(beadColors(a, '#000000', 4)[0], '#FF0000');
+  assert.strictEqual(beadColors(b, '#000000', 4)[0], '#00FF00', 'served the other skin from cache');
 });
 
 test('a body only ever needs a few draw calls', () => {
@@ -74,4 +84,39 @@ test('a skin with no scales still yields a usable highlight colour', () => {
   // Callers gate on skin.scales, but the helper must not throw if they do not.
   assert.match(scaleHighlight(undefined, '#3FA9F5'), /^#[0-9a-f]{6}$/i);
   assert.match(scaleHighlight(bumble, '#3FA9F5'), /^#[0-9a-f]{6}$/i);
+});
+
+/**
+ * Growing must not restyle the body.
+ *
+ * Colours used to be spread across the snake's own length, so eating shifted
+ * every bead's place in the gradient and the whole body flashed — worst during
+ * a feast, when it happens several times a second.
+ */
+test('a body already on screen does not change colour when the snake grows', () => {
+  for (const skin of LOCAL_SKINS) {
+    const before = beadColors(skin, '#3FA9F5', 40);
+    const after = beadColors(skin, '#3FA9F5', 41);
+    assert.deepStrictEqual(
+      after.slice(0, 40),
+      before,
+      `${skin.id} re-coloured its existing body on growth`
+    );
+  }
+});
+
+test('growth stays stable across a whole feast, not just one bite', () => {
+  const ember = LOCAL_SKINS.find((s) => s.id === 'ember')!;
+  let prev = beadColors(ember, '#000000', 8);
+  for (let n = 9; n <= 90; n++) {
+    const next = beadColors(ember, '#000000', n);
+    assert.deepStrictEqual(next.slice(0, n - 1), prev, `changed at ${n} beads`);
+    prev = next;
+  }
+});
+
+test('a gradient still uses its whole range on a grown snake', () => {
+  const ember = LOCAL_SKINS.find((s) => s.id === 'ember')!;
+  const long = new Set(beadColors(ember, '#000000', 60));
+  assert.ok(long.size >= 4, `expected a visible ramp, got ${long.size} colours`);
 });

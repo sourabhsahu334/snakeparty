@@ -11,6 +11,22 @@ const cache = new Map<string, string[]>();
 /** Gradients are quantised to this many steps so a body needs few draw calls. */
 const GRADIENT_STEPS = 6;
 
+/**
+ * How many beads a gradient runs across before it holds its final colour.
+ *
+ * Anchoring to a fixed span rather than to the snake's own length is the whole
+ * point. Normalising by bead count meant every bead's position in the gradient
+ * changed the instant the snake ate — with only six steps, a bite pushed beads
+ * across step boundaries and the entire body visibly re-coloured. During a
+ * feast that reads as flashing.
+ *
+ * Indexed from the head, growth now appends tail-coloured beads and nothing
+ * already on screen changes. The span is long enough that a mature snake still
+ * shows the whole ramp, and short enough that a small one is not just its
+ * first colour.
+ */
+const GRADIENT_SPAN = 46;
+
 export function beadColors(
   skin: Skin | undefined,
   baseColor: string,
@@ -18,7 +34,13 @@ export function beadColors(
 ): string[] {
   if (beads <= 0) return [];
   const id = skin?.id ?? 'classic';
-  const key = `${id}|${baseColor}|${beads}`;
+  // The pattern is part of the key, not just the id. The server's catalogue
+  // replaces this one at game_start, so the same id can carry different stops
+  // in the picker and in the round — keying on the id alone let whichever ran
+  // first pin the colours for the other.
+  const key = `${id}|${skin?.mode ?? ''}|${skin?.band ?? ''}|${
+    skin?.pattern?.join(',') ?? ''
+  }|${baseColor}|${beads}`;
   const hit = cache.get(key);
   if (hit) return hit;
 
@@ -39,7 +61,9 @@ function build(skin: Skin | undefined, baseColor: string, beads: number): string
       steps.push(sampleGradient(pattern, i / (GRADIENT_STEPS - 1)));
     }
     return Array.from({ length: beads }, (_, i) => {
-      const t = beads === 1 ? 0 : i / (beads - 1);
+      // Absolute distance from the head — never a fraction of the body, or the
+      // colours would slide every time the snake grows.
+      const t = Math.min(1, i / GRADIENT_SPAN);
       return steps[Math.min(GRADIENT_STEPS - 1, Math.round(t * (GRADIENT_STEPS - 1)))];
     });
   }
