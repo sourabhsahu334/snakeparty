@@ -10,8 +10,11 @@
  */
 process.env.PORT = process.env.PORT || '3997';
 process.env.AUTH_JWT_SECRET = 'account-gate-test-secret';
-// The gate is ON here — that is the thing under test.
-delete process.env.REQUIRE_ACCOUNT_FOR_ROOMS;
+// The gate is ON here — that is the thing under test. Set rather than deleted:
+// index.js runs dotenv, which would otherwise refill this from server/.env,
+// where the flag is currently false. dotenv does not overwrite a var that is
+// already set, so assigning it wins.
+process.env.REQUIRE_ACCOUNT_FOR_ROOMS = 'true';
 
 const { io: ioClient } = require('socket.io-client');
 const { httpServer } = require('../src/index');
@@ -78,8 +81,15 @@ setTimeout(async () => {
     username: 'Real2',
     google_sub: 'google-sub-2',
   }));
-  ok((await emit(joiner, 'join_room', { code: created.code })).ok,
-     'and another account can join it');
+  const joinAck = await emit(joiner, 'join_room', { code: created.code });
+  ok(joinAck.ok, 'and another account can join it');
+
+  // Hosting is the only thing that costs. create_room reports a balance
+  // because it just spent one; join_room reports none because it spent
+  // nothing. If a credits field ever appears on a join ack, something on the
+  // join path has started touching the counter.
+  ok('credits' in created, 'create_room reports the balance it just spent from');
+  ok(!('credits' in joinAck), 'join_room reports NO balance — joining burns nothing');
 
   // A refused guest must not have been charged on the way out.
   ok(
@@ -87,7 +97,7 @@ setTimeout(async () => {
     'a refused guest is gated, not silently charged a credit'
   );
 
-  console.log(fail === 0 ? `\n${8 - 0}/8 account-gate checks passed` : `\n${fail} FAILED`);
+  console.log(fail === 0 ? `\n${10}/10 account-gate checks passed` : `\n${fail} FAILED`);
   [noToken, guest, account, joiner].forEach((s) => s.close());
   httpServer.close(() => process.exit(fail === 0 ? 0 : 1));
   setTimeout(() => process.exit(fail === 0 ? 0 : 1), 1500).unref();
