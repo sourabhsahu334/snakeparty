@@ -52,6 +52,7 @@ services:
       GOOGLE_WEB_CLIENT_ID: "${GOOGLE_WEB_CLIENT_ID:-}"
       FREE_ROOMS_PER_DAY: "${FREE_ROOMS_PER_DAY:-2}"
       CREDITS_TIMEZONE: "${CREDITS_TIMEZONE:-Asia/Kolkata}"
+      REQUIRE_ACCOUNT_FOR_ROOMS: "${REQUIRE_ACCOUNT_FOR_ROOMS:-true}"
     expose:
       - "3001"
 
