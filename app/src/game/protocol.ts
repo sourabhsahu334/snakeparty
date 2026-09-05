@@ -284,7 +284,51 @@ export function lerpAngle(from: number, to: number, t: number): number {
   return from + normalizeAngle(to - from) * t;
 }
 
+/** Today's free room allowance, as the server reports it. */
+export type Credits = {
+  remaining: number;
+  perDay: number;
+  /** ISO instant of the next reset. Absent on a successful create. */
+  resetsAt?: string;
+};
+
+/**
+ * "4h 12m" until the daily rooms come back.
+ *
+ * Rounded up, so a player is never told "0 min" while still being refused —
+ * and capped at hours because the reset is at most a day away.
+ */
+export function timeUntil(iso?: string): string {
+  if (!iso) return 'a few hours';
+  const ms = new Date(iso).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return 'a few hours';
+  if (ms <= 0) return 'a moment';
+  const mins = Math.ceil(ms / 60_000);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+/**
+ * What to tell a player who has run out of rooms.
+ *
+ * Deliberately says they can still join: the limit is on hosting, and someone
+ * who reads this as "I cannot play until tomorrow" has been told the wrong
+ * thing.
+ */
+export function noCreditsText(credits?: Credits): string {
+  const perDay = credits?.perDay ?? 2;
+  return (
+    `You've used today's ${perDay} free rooms. ` +
+    `They refill in ${timeUntil(credits?.resetsAt)} — ` +
+    'you can still join a friend\'s room for free.'
+  );
+}
+
 export const ERROR_TEXT: Record<string, string> = {
+  NO_ROOM_CREDITS: "You've used today's free rooms. You can still join a friend's room.",
   ROOM_NOT_FOUND: "That code doesn't match any room.",
   ROOM_FULL: 'That room is already full.',
   ROOM_IN_PROGRESS: 'That game has already started.',

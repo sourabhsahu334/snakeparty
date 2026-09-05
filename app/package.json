@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.test.json && node --test .test-build/prediction.test.js .test-build/skins.test.js .test-build/slither.test.js .test-build/tiers.test.js .test-build/soloGame.test.js .test-build/soloSettings.test.js",
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/prediction.test.js .test-build/skins.test.js .test-build/slither.test.js .test-build/tiers.test.js .test-build/soloGame.test.js .test-build/soloSettings.test.js .test-build/credits.test.js",
     "gen:skins": "node scripts/gen-skins.js",
     "gen:store": "node scripts/gen-store-assets.js",
     "art:palette": "node scripts/sample-art-palette.js"

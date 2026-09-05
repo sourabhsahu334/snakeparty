@@ -27,3 +27,7 @@ keystore.properties
 # the app reads the client ID from EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID. Kept out of
 # the repo so its presence never implies otherwise.
 google-services.json
+
+# Play App Signing certificates, downloaded to read their SHA-1 fingerprints.
+# Public certs, not secrets — but they belong in the Play Console, not here.
+certificates*/
