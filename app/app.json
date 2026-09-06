@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.neukaps.snakeparty",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundImage": "./assets/adaptive-icon-background.png",
