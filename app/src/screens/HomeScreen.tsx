@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -147,13 +146,13 @@ export function HomeScreen() {
     game.startSolo(username, solo);
   }, [game, solo, username]);
 
+  // Opening the socket is deferred to here, not the mount effect, so single
+  // player still works with the server switched off. connect() is idempotent,
+  // so backing out to the modes list and picking Multiplayer again is fine.
   const onMultiplayer = useCallback(() => {
-    Alert.alert(
-      'Coming soon',
-      'Multiplayer rooms are still in the works. Single player is ready to go.',
-      [{ text: 'OK' }],
-    );
-  }, []);
+    setStep('online');
+    void game.connect(username.trim() || 'Player');
+  }, [game, username]);
 
   const onCreate = useCallback(async () => {
     setLocalError(null);
