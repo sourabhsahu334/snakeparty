@@ -178,3 +178,52 @@ export async function getCredits(): Promise<Credits | null> {
   if (!current) return null;
   return api<Credits>('/me/credits', { token: current.accessToken });
 }
+
+// -------------------------------------------------------------- leaderboard
+
+export type LeaderMode = 'solo' | 'multi';
+
+export type LeaderRow = {
+  player_id: string | null;
+  username: string;
+  score: number;
+  runs: number;
+  last_at: string;
+};
+
+export type Standing = { score: number; runs: number; rank: number };
+
+export type Board = { mode: LeaderMode; top: LeaderRow[]; you: Standing | null };
+
+/**
+ * Bank a finished single-player run.
+ *
+ * Needs an identity, and a pure-solo player may never have signed in — so one
+ * is minted here rather than dropping the score. Silent either way: the run is
+ * over and the summary is already on screen, so a server that is down must not
+ * turn into an error the player has to dismiss.
+ */
+export async function submitSoloScore(
+  username: string,
+  score: number,
+  durationMs: number
+): Promise<boolean> {
+  let current = await getSession();
+  if (!current) current = await signInAnonymously(username || 'Player');
+  if (!current) return false;
+
+  const res = await api<{ ok: boolean }>('/solo/score', {
+    method: 'POST',
+    token: current.accessToken,
+    body: { score, durationMs, username },
+  });
+  return !!res && res.ok;
+}
+
+export async function getLeaderboard(mode: LeaderMode, limit = 25): Promise<Board | null> {
+  const current = await getSession();
+  if (!current) return null;
+  return api<Board>(`/leaderboard?mode=${mode}&limit=${limit}`, {
+    token: current.accessToken,
+  });
+}

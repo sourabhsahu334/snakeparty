@@ -11,6 +11,7 @@ import {
   type Choice,
   type SoloSettings,
 } from '../game/soloSettings';
+import type { ControlSide } from '../lib/prefs';
 import { theme, ui } from '../lib/theme';
 
 type Props = {
@@ -23,6 +24,10 @@ type Props = {
   variant?: 'menu' | 'paused';
   /** Shown as a ghost link under the main button, when there is one. */
   onQuit?: () => void;
+  /** Which side the joystick sits on. Applies to multiplayer too, so it is a
+   *  standalone preference rather than one of the run's rules. */
+  controlSide?: ControlSide;
+  onControlSide?: (side: ControlSide) => void;
 };
 
 /**
@@ -40,6 +45,8 @@ export function SoloSetupSheet({
   onClose,
   variant = 'menu',
   onQuit,
+  controlSide,
+  onControlSide,
 }: Props) {
   const insets = useSafeAreaInsets();
   const paused = variant === 'paused';
@@ -113,6 +120,9 @@ export function SoloSetupSheet({
                 value={settings.food}
                 onPick={(food) => set({ food })}
               />
+              {controlSide && onControlSide && (
+                <SideRow value={controlSide} onPick={onControlSide} />
+              )}
             </View>
           </ScrollView>
 
@@ -134,6 +144,44 @@ export function SoloSetupSheet({
         </View>
       </View>
     </Modal>
+  );
+}
+
+/**
+ * Handedness. Separate from `Row` because the value is a side, not a number,
+ * and because it is the one control here that outlives the run — it applies
+ * in multiplayer too.
+ */
+function SideRow({
+  value,
+  onPick,
+}: {
+  value: ControlSide;
+  onPick: (side: ControlSide) => void;
+}) {
+  const sides: { label: string; value: ControlSide }[] = [
+    { label: 'Left', value: 'left' },
+    { label: 'Right', value: 'right' },
+  ];
+  return (
+    <View style={styles.rowCell}>
+      <Text style={styles.rowLabel}>Joystick side</Text>
+      <Text style={styles.rowHint}>Boost takes the other corner.</Text>
+      <View style={styles.chips}>
+        {sides.map((c) => {
+          const on = c.value === value;
+          return (
+            <Pressable
+              key={c.value}
+              onPress={() => onPick(c.value)}
+              style={[styles.chip, on && styles.chipOn]}
+            >
+              <Text style={[styles.chipText, on && styles.chipTextOn]}>{c.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 

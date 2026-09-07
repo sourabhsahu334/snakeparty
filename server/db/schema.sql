@@ -79,3 +79,26 @@ create table if not exists match_results (
 
 create index if not exists match_results_match_idx  on match_results (match_id);
 create index if not exists match_results_player_idx on match_results (player_id);
+
+-- --------------------------------------------------------------- solo_runs --
+
+-- Single-player runs. Multiplayer already lands in match_results, but a solo
+-- run never reaches the game loop on this server at all — it is simulated
+-- entirely on the device — so there is nowhere else for its score to live.
+--
+-- IMPORTANT: a row here is a *claim*, not an observation. The server did not
+-- watch this run and cannot verify it; the endpoint only rejects scores that
+-- are outright impossible. Multiplayer scores in match_results are
+-- server-authoritative and are the only ones that carry real weight.
+create table if not exists solo_runs (
+  id         uuid primary key default gen_random_uuid(),
+  player_id  uuid not null references players (id) on delete cascade,
+  username   text not null default 'Player',
+  score      int  not null default 0 check (score >= 0),
+  duration_ms int not null default 0,
+  played_at  timestamptz not null default now()
+);
+
+-- The leaderboard reads "best score per player", so lead with the player.
+create index if not exists solo_runs_player_idx on solo_runs (player_id, score desc);
+create index if not exists solo_runs_score_idx  on solo_runs (score desc);

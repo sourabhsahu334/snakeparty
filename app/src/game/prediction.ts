@@ -20,6 +20,44 @@ export const SNAP_DISTANCE = 90;
 export const CORRECTION_MS = 140;
 /** Never extrapolate more than this many ticks if updates stop arriving. */
 export const MAX_EXTRAPOLATION = 1.5;
+
+/*
+ * Everything below adapts the three constants above to the link the player
+ * actually has.
+ *
+ * The defaults assume updates arrive every tick (50ms at 20Hz), which is true
+ * on a good connection and false on a bad one. When they arrive every 200ms
+ * instead, the old fixed numbers produce exactly the symptoms a slow link is
+ * blamed for: other snakes glide for 75ms, freeze for 125ms and then teleport,
+ * and your own snake drifts past SNAP_DISTANCE between updates so it is
+ * repeatedly snapped rather than smoothly corrected. Neither is the latency
+ * itself — both are the client refusing to cover the gap.
+ *
+ * So measure the gap and scale to it. On a fast link every ratio below is 1
+ * and the behaviour is bit-for-bit what it was.
+ */
+
+/** Extrapolate a little past the expected arrival, so a late frame still glides. */
+const EXTRAPOLATION_HEADROOM = 1.3;
+/**
+ * Hard ceiling on extrapolation, in ticks. Extrapolation assumes the snake
+ * keeps its heading, so it is only honest for so long — past ~300ms a turn
+ * that already happened is being drawn as a straight line, and a bigger
+ * correction later is worse than a brief stall now.
+ */
+const MAX_EXTRAPOLATION_CEILING = 6;
+/** How far the snap threshold may stretch on a slow link. */
+const SNAP_RATIO_CAP = 4;
+/**
+ * How far the correction window may stretch. Deliberately tighter than the
+ * snap cap: a correction that blends too slowly reads as the snake trailing
+ * behind your thumb, which is the feeling we are trying to remove.
+ */
+const CORRECTION_RATIO_CAP = 2;
+/** Gaps longer than this are not the network — a backgrounded app, or a pause. */
+const MAX_PLAUSIBLE_GAP_MS = 2000;
+/** How much of each observed gap is folded into the running estimate. */
+const GAP_SMOOTHING = 0.2;
 /**
  * How much of each new frame delta is folded into the smoothed one.
  *
@@ -156,6 +194,13 @@ export class GameSimulation {
    */
   private frameDt = 1 / 60;
 
+  /**
+   * Smoothed gap between server updates, in ms; 0 until two have arrived.
+   * Everything that adapts to link quality reads this through `gapMs()`.
+   */
+  private updateGapMs = 0;
+  private lastViewAt = 0;
+
   constructor(now: () => number = nowMs) {
     this.now = now;
   }
@@ -171,8 +216,11 @@ export class GameSimulation {
       this.offset = { x: 0, y: 0 };
     } else {
       // Start the clock from now, or the whole pause is applied as one
-      // enormous step on the next frame.
+      // enormous step on the next frame. The same goes for the update gap:
+      // the gap across a pause says nothing about the link, and a short one
+      // would slip under MAX_PLAUSIBLE_GAP_MS and be believed.
       this.predAt = this.now();
+      this.lastViewAt = 0;
       this.frameDt = 1 / 60;
     }
   }
@@ -199,6 +247,22 @@ export class GameSimulation {
 
   applyView(v: ViewUpdate) {
     const now = this.now();
+
+    // Track how often updates actually arrive. Absurd gaps are thrown away
+    // rather than smoothed in: they mean the app was backgrounded or the run
+    // was paused, and letting one poison the estimate would leave the arena
+    // over-extrapolating for several seconds after coming back.
+    if (this.lastViewAt > 0) {
+      const gap = now - this.lastViewAt;
+      if (gap > 0 && gap < MAX_PLAUSIBLE_GAP_MS) {
+        this.updateGapMs =
+          this.updateGapMs === 0
+            ? gap
+            : this.updateGapMs + (gap - this.updateGapMs) * GAP_SMOOTHING;
+      }
+    }
+    this.lastViewAt = now;
+
     this.localId = v.me;
     this.localAlive = v.alive === 1;
 
@@ -302,6 +366,36 @@ export class GameSimulation {
   }
 
   /**
+   * Observed gap between updates, never below the nominal tick — a server
+   * that is keeping up should not make the client more forgiving than the
+   * defaults.
+   */
+  private gapMs(): number {
+    return Math.max(this.meta.tickMs, this.updateGapMs || this.meta.tickMs);
+  }
+
+  /** How much slower than nominal the updates are arriving. 1 on a good link. */
+  private linkRatio(): number {
+    return this.gapMs() / this.meta.tickMs;
+  }
+
+  /** Ticks of extrapolation the current link earns. */
+  private maxExtrapolation(): number {
+    const ticks = this.linkRatio() * EXTRAPOLATION_HEADROOM;
+    return Math.min(MAX_EXTRAPOLATION_CEILING, Math.max(MAX_EXTRAPOLATION, ticks));
+  }
+
+  /** Divergence tolerated before snapping, stretched for a slow link. */
+  private snapDistance(): number {
+    return SNAP_DISTANCE * Math.min(SNAP_RATIO_CAP, this.linkRatio());
+  }
+
+  /** How long a correction blends for, stretched for a slow link. */
+  private correctionMs(): number {
+    return CORRECTION_MS * Math.min(CORRECTION_RATIO_CAP, this.linkRatio());
+  }
+
+  /**
    * Fold the authoritative head into the local prediction. If we were close,
    * carry the difference as a decaying visual offset so the correction is
    * invisible; if we were way off, snap.
@@ -317,7 +411,7 @@ export class GameSimulation {
     this.predAt = this.now();
 
     if (dist < 0.5) return;
-    if (dist > SNAP_DISTANCE) {
+    if (dist > this.snapDistance()) {
       this.offset = { x: 0, y: 0 };
       return;
     }
@@ -398,7 +492,7 @@ export class GameSimulation {
 
   private currentOffset(): Vec {
     if (this.offset.x === 0 && this.offset.y === 0) return this.offset;
-    const t = (this.now() - this.offsetAt) / CORRECTION_MS;
+    const t = (this.now() - this.offsetAt) / this.correctionMs();
     if (t >= 1) {
       this.offset = { x: 0, y: 0 };
       return this.offset;
@@ -441,7 +535,10 @@ export class GameSimulation {
         // Extrapolate other snakes along their heading since their last update.
         const alpha = this.paused
           ? 0
-          : Math.min(MAX_EXTRAPOLATION, Math.max(0, (now - s.updatedAt) / this.meta.tickMs));
+          : Math.min(
+              this.maxExtrapolation(),
+              Math.max(0, (now - s.updatedAt) / this.meta.tickMs)
+            );
         const speed = (s.boosting ? this.meta.boostSpeed : this.meta.baseSpeed) *
           (this.meta.tickMs / 1000);
         head = {
@@ -507,6 +604,8 @@ export class GameSimulation {
     this.offset = { x: 0, y: 0 };
     this.paused = false;
     this.frameDt = 1 / 60;
+    this.updateGapMs = 0;
+    this.lastViewAt = 0;
   }
 }
 

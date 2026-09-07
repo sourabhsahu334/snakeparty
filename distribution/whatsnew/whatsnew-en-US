@@ -1,2 +1,5 @@
-Multiplayer now signs you in with Google first, so rooms and match history
-follow your account instead of a guest name.
+New leaderboards for single player and multiplayer — your best run lands there
+when a game ends.
+Smoother play on slow connections: snakes no longer freeze and jump.
+The lobby now keeps itself up to date, so players who join always show up.
+You can move the joystick to the right-hand side in settings.

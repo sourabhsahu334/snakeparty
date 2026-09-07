@@ -14,13 +14,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PALETTE, useGame } from '../game/useGameSocket';
 import { SkinButton } from '../game/SkinGallery';
 import { SoloSetupSheet } from './SoloSetupSheet';
+import { LeaderboardScreen } from './LeaderboardScreen';
 import { errorText, noCreditsText, timeUntil } from '../game/protocol';
 import {
   DEFAULT_SOLO_SETTINGS,
   describe,
   type SoloSettings,
 } from '../game/soloSettings';
-import { loadSoloSettings, saveSoloSettings } from '../lib/prefs';
+import {
+  DEFAULT_CONTROL_SIDE,
+  loadControlSide,
+  loadSoloSettings,
+  saveControlSide,
+  saveSoloSettings,
+  type ControlSide,
+} from '../lib/prefs';
 import {
   getSession,
   setUsername as saveUsername,
@@ -62,6 +70,8 @@ export function HomeScreen() {
   const [step, setStep] = useState<'modes' | 'online'>('modes');
   const [setup, setSetup] = useState(false);
   const [solo, setSolo] = useState<SoloSettings>(DEFAULT_SOLO_SETTINGS);
+  const [controlSide, setControlSide] = useState<ControlSide>(DEFAULT_CONTROL_SIDE);
+  const [boardOpen, setBoardOpen] = useState(false);
 
   // No connection is opened here. Single player must work with the server
   // switched off entirely, so the socket waits until Multiplayer is picked.
@@ -76,8 +86,10 @@ export function HomeScreen() {
       // before they tap anything — finding out you are out of rooms by being
       // refused is a worse way to learn it.
       if (s) void game.refreshCredits();
-      const saved = await loadSoloSettings();
-      if (!cancelled) setSolo(saved);
+      const [saved, side] = await Promise.all([loadSoloSettings(), loadControlSide()]);
+      if (cancelled) return;
+      setSolo(saved);
+      setControlSide(side);
     })();
     return () => {
       cancelled = true;
@@ -303,6 +315,14 @@ export function HomeScreen() {
                 blurb="Make a room, or join a friend with their 5-letter code."
                 onPress={onMultiplayer}
               />
+              {/* Not a third ModeCard: it does not start anything, and giving
+                  it equal weight would push the two real choices around. */}
+              <Pressable
+                onPress={() => setBoardOpen(true)}
+                style={[ui.buttonGhost, { marginTop: 8, paddingVertical: 10 }]}
+              >
+                <Text style={ui.buttonGhostText}>🏆  LEADERBOARD</Text>
+              </Pressable>
             </>
           ) : (
             <>
@@ -402,7 +422,14 @@ export function HomeScreen() {
         onChange={setSolo}
         onStart={startRun}
         onClose={() => setSetup(false)}
+        controlSide={controlSide}
+        onControlSide={(side) => {
+          setControlSide(side);
+          void saveControlSide(side);
+        }}
       />
+
+      <LeaderboardScreen visible={boardOpen} onClose={() => setBoardOpen(false)} />
     </KeyboardAvoidingView>
   );
 }

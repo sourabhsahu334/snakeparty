@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,13 +7,20 @@ import { BoostButton, Joystick } from '../game/Controls';
 import { useGame } from '../game/useGameSocket';
 import { SoloSetupSheet } from './SoloSetupSheet';
 import type { SoloSettings } from '../game/soloSettings';
-import { saveSoloSettings } from '../lib/prefs';
+import {
+  DEFAULT_CONTROL_SIDE,
+  loadControlSide,
+  saveControlSide,
+  saveSoloSettings,
+  type ControlSide,
+} from '../lib/prefs';
 import { theme } from '../lib/theme';
 
 /**
  * The arena screen. The canvas fills the whole display and every HUD element
  * floats on top of it, laid out the way snake.io does: score dead centre at the
- * top, leaderboard top-right, joystick bottom-left, boost bottom-right.
+ * top, leaderboard top-right, and the stick and boost pad in the bottom
+ * corners — which way round is the player's choice, see `controlSide`.
  */
 export function GameScreen() {
   const game = useGame();
@@ -24,6 +31,19 @@ export function GameScreen() {
 
   // Draft settings, so backing out of the sheet doesn't half-apply an edit.
   const [draft, setDraft] = useState<SoloSettings | null>(null);
+
+  // Handedness. Read once on mount and kept here so the sheet can flip it
+  // live — the stick moving under your thumb as you tap is the whole point.
+  const [controlSide, setControlSide] = useState<ControlSide>(DEFAULT_CONTROL_SIDE);
+  useEffect(() => {
+    let cancelled = false;
+    void loadControlSide().then((s) => {
+      if (!cancelled) setControlSide(s);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onAngle = useCallback((a: number) => game.setAngle(a), [game]);
   const onBoost = useCallback((b: boolean) => game.setBoost(b), [game]);
@@ -172,18 +192,40 @@ export function GameScreen() {
             setDraft(null);
             game.leaveRoom();
           }}
+          controlSide={controlSide}
+          onControlSide={(side) => {
+            setControlSide(side);
+            void saveControlSide(side);
+          }}
         />
       )}
 
       {game.alive && (
         <>
-          {/* Tucked into the bottom-left corner, and lifted a little off the
-              bottom edge so the ring is not clipped by a home indicator or a
-              rounded display corner. */}
-          <View style={[styles.stick, { bottom: insets.bottom + 20, left: insets.left + 12 }]}>
+          {/* Lifted a little off the bottom edge so neither control is clipped
+              by a home indicator or a rounded display corner. The stick takes
+              the side the player picked; boost always takes the other one, so
+              the two never stack up under one thumb. */}
+          <View
+            style={[
+              styles.stick,
+              { bottom: insets.bottom + 20 },
+              controlSide === 'left'
+                ? { left: insets.left + 12 }
+                : { right: insets.right + 12 },
+            ]}
+          >
             <Joystick onAngle={onAngle} />
           </View>
-          <View style={[styles.boost, { bottom: insets.bottom + 14, right: insets.right + 16 }]}>
+          <View
+            style={[
+              styles.boost,
+              { bottom: insets.bottom + 14 },
+              controlSide === 'left'
+                ? { right: insets.right + 16 }
+                : { left: insets.left + 16 },
+            ]}
+          >
             <BoostButton
               onChange={onBoost}
               disabled={!!mine && mine.score <= game.sim.meta.boostMinScore}

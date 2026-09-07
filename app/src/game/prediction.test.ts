@@ -367,3 +367,89 @@ test('skins resolve from the catalogue', () => {
   const rendered = sim.getRenderSnakes();
   assert.strictEqual(rendered.find((s) => s.id === 2)!.skin!.id, 'bumble');
 });
+
+// ---------------------------------------------------------------------------
+// Adapting to a slow link.
+//
+// The complaint these cover: the game is smooth on fast internet and lurches
+// on slow. The latency is not the bug — the bug is a client tuned for updates
+// every tick giving up 75ms in when they arrive every 200ms, so snakes freeze
+// and then teleport. These pin the adaptation, and the "unchanged on a fast
+// link" case that guards against fixing slow by degrading fast.
+// ---------------------------------------------------------------------------
+
+/** Feed `n` server updates `gapMs` apart, so the sim can measure the cadence. */
+function driveAtCadence(
+  sim: GameSimulation,
+  clock: { advance: (ms: number) => number },
+  gapMs: number,
+  n: number
+) {
+  let x = 300;
+  const step = META.baseSpeed * (gapMs / 1000);
+  for (let i = 0; i < n; i++) {
+    clock.advance(gapMs);
+    x += step;
+    sim.applyView({ ...enterView(), enter: [], move: [[2, x, 0, 0, 12, 40, 0]] });
+  }
+  return x;
+}
+
+test('a slow link keeps other snakes gliding instead of freezing mid-arena', () => {
+  const { sim, clock } = setup();
+  const last = driveAtCadence(sim, clock, 200, 4);
+
+  // 200ms after the last update, the old fixed 1.5-tick cap (75ms) would have
+  // stopped this snake dead 125ms ago and then teleported it on the next one.
+  clock.advance(200);
+  const head = sim.getRenderSnakes().find((s) => s.id === 2)!.head.x;
+  const perTick = META.baseSpeed * (META.tickMs / 1000);
+  assert.ok(
+    head > last + perTick * 1.5,
+    `stalled at the old cap: ${head.toFixed(1)} vs last update ${last.toFixed(1)}`
+  );
+});
+
+test('extrapolation still has a ceiling — a dead link does not launch snakes', () => {
+  const { sim, clock } = setup();
+  const last = driveAtCadence(sim, clock, 200, 4);
+
+  clock.advance(30_000);
+  const head = sim.getRenderSnakes().find((s) => s.id === 2)!.head.x;
+  const perTick = META.baseSpeed * (META.tickMs / 1000);
+  assert.ok(
+    head <= last + perTick * 6 + 0.01,
+    `ran past the ceiling to ${head.toFixed(1)}`
+  );
+});
+
+test('a fast link is left exactly as it was', () => {
+  const { sim, clock } = setup();
+  const last = driveAtCadence(sim, clock, META.tickMs, 6);
+
+  clock.advance(5000);
+  const head = sim.getRenderSnakes().find((s) => s.id === 2)!.head.x;
+  const perTick = META.baseSpeed * (META.tickMs / 1000);
+  assert.ok(
+    head <= last + perTick * 1.5 + 0.01,
+    `a good connection should still cap at 1.5 ticks, got ${head.toFixed(1)}`
+  );
+});
+
+test('a slow link corrects smoothly where a fast one would snap', () => {
+  const { sim, clock } = setup();
+  driveAtCadence(sim, clock, 200, 4);
+
+  // Divergence past the fixed threshold, but well inside what a 4x-slow link
+  // earns. It should be carried as a blended offset, not snapped to.
+  sim.setDesiredAngle(0);
+  advanceFrames(sim, clock, 50);
+  const far = SNAP_DISTANCE + 60;
+  sim.applyView({ ...enterView(), enter: [], move: [[1, far, 0, 0, 10, 10, 0]] });
+
+  const cam = sim.cameraTarget();
+  assert.ok(
+    Math.abs(cam.x - far) > 3,
+    `snapped to the server position instead of blending: ${cam.x.toFixed(1)}`
+  );
+});

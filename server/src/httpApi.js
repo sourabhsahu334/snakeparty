@@ -3,6 +3,7 @@
 const auth = require('./auth');
 const credits = require('./credits');
 const matches = require('./matches');
+const leaderboard = require('./leaderboard');
 const db = require('./db');
 
 /**
@@ -151,6 +152,51 @@ async function handle(req, res, ctx) {
     const claims = auth.verifyToken(bearer(req));
     if (!claims) return send(res, 401, { error: 'UNAUTHORIZED' }), true;
     send(res, 200, { matches: await matches.historyFor(claims.id, url.searchParams.get('limit')) });
+    return true;
+  }
+
+  // ----------------------------------------------------------- leaderboard
+
+  /**
+   * Bank a finished single-player run.
+   *
+   * Authed so a score always belongs to somebody — the board is worthless if
+   * anonymous rows can pile onto it. The score itself is still only a claim;
+   * see the note in leaderboard.js.
+   */
+  if (path === '/solo/score' && req.method === 'POST') {
+    const claims = auth.verifyToken(bearer(req));
+    if (!claims) return send(res, 401, { error: 'UNAUTHORIZED' }), true;
+    const body = await readJson(req);
+    if (!body) return send(res, 400, { error: 'BAD_BODY' }), true;
+
+    const ok = await leaderboard.recordSoloRun({
+      playerId: claims.id,
+      username: claims.username || body.username,
+      score: body.score,
+      durationMs: body.durationMs,
+    });
+    send(res, ok ? 200 : 400, { ok });
+    return true;
+  }
+
+  /**
+   * The board itself. Open to any signed-in player — including guests, who can
+   * appear on it, so hiding it from them would be strange.
+   */
+  if (path === '/leaderboard' && req.method === 'GET') {
+    const claims = auth.verifyToken(bearer(req));
+    if (!claims) return send(res, 401, { error: 'UNAUTHORIZED' }), true;
+
+    const mode = leaderboard.MODES.includes(url.searchParams.get('mode'))
+      ? url.searchParams.get('mode')
+      : 'multi';
+
+    send(res, 200, {
+      mode,
+      top: await leaderboard.top(mode, url.searchParams.get('limit')),
+      you: await leaderboard.standingFor(claims.id, mode),
+    });
     return true;
   }
 

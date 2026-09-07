@@ -12,7 +12,7 @@ import { io, type Socket } from 'socket.io-client';
 import { SERVER_URL } from '../lib/env';
 import { getClientId } from '../lib/clientId';
 import { loadLook, saveLook } from '../lib/prefs';
-import { getCredits, getSession } from '../lib/session';
+import { getCredits, getSession, submitSoloScore } from '../lib/session';
 import { GameSimulation } from './prediction';
 import { PALETTE } from './palette';
 import { SoloGame } from './soloGame';
@@ -62,6 +62,7 @@ export type GameSocket = {
   /** Today's free room allowance. null until the player has an identity. */
   credits: Credits | null;
   refreshCredits: () => Promise<Credits | null>;
+  refreshLobby: () => Promise<boolean>;
 
   roomCode: string | null;
   lobby: LobbyState | null;
@@ -353,6 +354,13 @@ export function useGameSocket(): GameSocket {
               setPhase('lobby');
             }
           });
+        } else if (phaseRef.current === 'lobby' && roomRef.current) {
+          // Reconnected without needing to reclaim a seat. No lobby_state is
+          // pushed on a plain reconnect, so the roster we are showing is
+          // whatever it was before the drop — ask for the current one.
+          socket.emit('get_lobby', {}, (res: Ack & { lobby?: LobbyState }) => {
+            if (res && res.ok && res.lobby) setLobby(res.lobby);
+          });
         }
       });
 
@@ -513,6 +521,20 @@ export function useGameSocket(): GameSocket {
     return res;
   }, [request, setMeBoth, setMode, setRoomBoth]);
 
+  /**
+   * Pull the roster instead of waiting for the next push.
+   *
+   * `lobby_state` is broadcast on every change, but a dropped frame or a
+   * silent socket reconnect leaves the roster stale forever — which is how a
+   * player who has genuinely joined ends up invisible to everyone already in
+   * the room. Cheap enough to call whenever the lobby comes into view.
+   */
+  const refreshLobby = useCallback(async () => {
+    const res = await request<Ack & { lobby?: LobbyState }>('get_lobby');
+    if (res.ok && res.lobby) setLobby(res.lobby);
+    return res.ok;
+  }, [request]);
+
   /** Ask the server what today's balance is. Safe to call on a cold start. */
   const refreshCredits = useCallback(async () => {
     const c = await getCredits();
@@ -629,9 +651,23 @@ export function useGameSocket(): GameSocket {
   const endRound = useCallback(async () => {
     const solo = soloRef.current;
     if (solo) {
-      setResults(solo.summary());
+      const summary = solo.summary();
+      setResults(summary);
       solo.stop();
       setPhase('results');
+
+      // The only moment a solo run is finished, so the only moment its score
+      // can reach the board. Multiplayer needs no equivalent — the server
+      // simulated that round and wrote match_results itself.
+      //
+      // Not awaited: the summary is already on screen and a slow or absent
+      // server must not hold up the transition.
+      // soloGame stamps the player's own row with this clientId; the rest are
+              // bots. Its score is already the run's best, not the score at death.
+              const mine = summary.results.find((r) => r.clientId === 'solo');
+      if (mine) {
+        void submitSoloScore(mine.username, mine.score, summary.durationMs);
+      }
       return { ok: true };
     }
     return request('end_round');
@@ -649,6 +685,7 @@ export function useGameSocket(): GameSocket {
     error,
     credits,
     refreshCredits,
+    refreshLobby,
     clearError: () => setError(null),
     roomCode,
     lobby,

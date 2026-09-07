@@ -211,6 +211,21 @@ io.on('connection', (socket) => {
     io.to(room.code).emit('lobby_state', room.lobbyState());
   });
 
+  /**
+   * Pull the roster on demand.
+   *
+   * Everything else here pushes `lobby_state` on change, which is fine until a
+   * push is missed — a frame dropped on a bad link, or a socket that
+   * reconnected without going through rejoin_room. The client then shows a
+   * roster that is permanently stale with no way to recover, so give it a way
+   * to ask.
+   */
+  socket.on('get_lobby', (_payload, cb) => {
+    const room = manager.roomForSocket(socket.id);
+    if (!room) return ack(cb, { ok: false, error: 'NOT_IN_ROOM' });
+    ack(cb, { ok: true, lobby: room.lobbyState(), status: room.status });
+  });
+
   // Change your colour and/or skin from the lobby.
   socket.on('set_look', (payload, cb) => {
     const room = manager.roomForSocket(socket.id);

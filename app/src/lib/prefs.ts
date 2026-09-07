@@ -59,3 +59,32 @@ export async function saveSoloSettings(s: SoloSettings): Promise<void> {
     /* non-fatal — the choice just won't survive a restart */
   }
 }
+
+const CONTROL_SIDE_KEY = 'snake.controlSide';
+
+/** Which side of the screen the joystick sits on. Boost takes the other one. */
+export type ControlSide = 'left' | 'right';
+
+export const DEFAULT_CONTROL_SIDE: ControlSide = 'left';
+
+/**
+ * Handedness. Deliberately not part of SoloSettings: it is how you hold the
+ * phone, not a rule of the run, so "Reset" must not flip it back and it has to
+ * apply in multiplayer too.
+ */
+export async function loadControlSide(): Promise<ControlSide> {
+  try {
+    const raw = await AsyncStorage.getItem(CONTROL_SIDE_KEY);
+    return raw === 'right' || raw === 'left' ? raw : DEFAULT_CONTROL_SIDE;
+  } catch {
+    return DEFAULT_CONTROL_SIDE;
+  }
+}
+
+export async function saveControlSide(side: ControlSide): Promise<void> {
+  try {
+    await AsyncStorage.setItem(CONTROL_SIDE_KEY, side);
+  } catch {
+    /* non-fatal — the choice just won't survive a restart */
+  }
+}

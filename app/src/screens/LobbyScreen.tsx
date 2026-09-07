@@ -1,5 +1,14 @@
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  AppState,
+  Pressable,
+  ScrollView,
+  Share,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 
@@ -22,6 +31,32 @@ export function LobbyScreen() {
   const code = game.roomCode ?? '';
   const players = game.lobby?.players ?? [];
   const maxPlayers = game.lobby?.maxPlayers ?? 5;
+
+  /**
+   * Keep the roster honest without a refresh button.
+   *
+   * The server pushes `lobby_state` on every change, so this is a backstop for
+   * the pushes that never arrive — a frame dropped on a bad link, or the app
+   * coming back from the background having missed the ones sent while it was
+   * away. Pull once as the screen opens, again whenever it is foregrounded,
+   * and slowly while it sits open, which is when someone is most likely to be
+   * joining. A stale roster is the difference between "nobody came" and a
+   * player standing in the room unseen.
+   */
+  const refresh = useRef(game.refreshLobby);
+  refresh.current = game.refreshLobby;
+
+  useEffect(() => {
+    void refresh.current();
+    const timer = setInterval(() => void refresh.current(), 5000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refresh.current();
+    });
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, []);
 
   const copy = useCallback(async () => {
     await Clipboard.setStringAsync(code);
