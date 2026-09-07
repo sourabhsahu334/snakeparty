@@ -360,7 +360,7 @@ export function useGameSocket(): GameSocket {
       socket.on('disconnect', () => setConn('reconnecting'));
       socket.on('connect_error', (err: Error) => {
         setConn('offline');
-        setError(`Can't reach the game server (${SERVER_URL}).`);
+        setError("Can't reach the game server.");
         console.warn('[socket] connect_error', err.message);
       });
 

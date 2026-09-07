@@ -21,7 +21,6 @@ import {
   type SoloSettings,
 } from '../game/soloSettings';
 import { loadSoloSettings, saveSoloSettings } from '../lib/prefs';
-import { SERVER_URL } from '../lib/env';
 import {
   getSession,
   setUsername as saveUsername,
@@ -103,15 +102,17 @@ export function HomeScreen() {
     void game.refreshCredits();
   }, [game, session, username]);
 
-  const onGoogle = useCallback(async () => {
+  // Returns the new session so a caller that needs to act on it — the
+  // multiplayer gate — does not have to wait for the state update to land.
+  const onGoogle = useCallback(async (): Promise<Session | null> => {
     setLocalError(null);
     setAuthBusy(true);
     const res = await signInWithGoogleAccount();
     setAuthBusy(false);
-    if (res.cancelled) return;
+    if (res.cancelled) return null;
     if (!res.session) {
       setLocalError(res.error ?? 'Google sign-in failed.');
-      return;
+      return null;
     }
 
     // A name the player actually typed beats the Google one; the placeholder
@@ -121,14 +122,13 @@ export function HomeScreen() {
     const name = (keep ? typed : res.session.username?.trim() || typed) || 'Player';
 
     setUsername(name);
-    if (name !== res.session.username) {
-      await saveUsername(name);
-      setSession({ ...res.session, username: name });
-    } else {
-      setSession(res.session);
-    }
+    const next =
+      name !== res.session.username ? { ...res.session, username: name } : res.session;
+    if (name !== res.session.username) await saveUsername(name);
+    setSession(next);
     // Hands the socket the new token if one is already open; a no-op otherwise.
     await game.reauthenticate(name);
+    return next;
   }, [game, username]);
 
   const onSignOut = useCallback(async () => {
@@ -146,13 +146,28 @@ export function HomeScreen() {
     game.startSolo(username, solo);
   }, [game, solo, username]);
 
+  // Rooms are tied to a real account, so Google sign-in comes first and the
+  // online step only opens once it succeeds — cancelling leaves you on the
+  // modes list rather than in a room screen that would refuse every action.
+  // Already signed in with Google? Straight through, no prompt.
+  //
   // Opening the socket is deferred to here, not the mount effect, so single
   // player still works with the server switched off. connect() is idempotent,
   // so backing out to the modes list and picking Multiplayer again is fine.
-  const onMultiplayer = useCallback(() => {
+  const onMultiplayer = useCallback(async () => {
+    setLocalError(null);
+
+    let active = session;
+    if (GOOGLE_ON && (!active || active.isGuest)) {
+      active = await onGoogle();
+      if (!active) return;
+    }
+
     setStep('online');
-    void game.connect(username.trim() || 'Player');
-  }, [game, username]);
+    // The freshly returned session carries the reconciled name; component
+    // state has not caught up yet at this point.
+    void game.connect(active?.username?.trim() || username.trim() || 'Player');
+  }, [game, onGoogle, session, username]);
 
   const onCreate = useCallback(async () => {
     setLocalError(null);
@@ -373,8 +388,7 @@ export function HomeScreen() {
                 </Text>
               ) : (
                 <Text numberOfLines={1} style={styles.server}>
-                  {SERVER_URL.replace(/^https?:\/\//, '')}
-                  {session && !session.isGuest ? ' · history on' : ' · guest'}
+                  {session && !session.isGuest ? 'History on' : 'Guest'}
                 </Text>
               )}
             </>
