@@ -202,14 +202,19 @@ export function GameScreen() {
 
       {game.alive && (
         <>
-          {/* Lifted a little off the bottom edge so neither control is clipped
-              by a home indicator or a rounded display corner. The stick takes
-              the side the player picked; boost always takes the other one, so
-              the two never stack up under one thumb. */}
+          {/* Lifted clear of the bottom edge, not just off it. Sitting on the
+              inset put both controls right where the home indicator and the
+              gesture bar are, so the thumb had to curl into the corner to
+              steer. The two offsets differ by the 6dp that keeps the stick and
+              the boost hex optically level — the hex is inset inside a taller
+              touch target — so they are raised by the same amount rather than
+              being flattened to one number. The stick takes the side the
+              player picked; boost always takes the other one, so the two never
+              stack up under one thumb. */}
           <View
             style={[
               styles.stick,
-              { bottom: insets.bottom + 20 },
+              { bottom: insets.bottom + 44 },
               controlSide === 'left'
                 ? { left: insets.left + 12 }
                 : { right: insets.right + 12 },
@@ -220,7 +225,7 @@ export function GameScreen() {
           <View
             style={[
               styles.boost,
-              { bottom: insets.bottom + 14 },
+              { bottom: insets.bottom + 38 },
               controlSide === 'left'
                 ? { right: insets.right + 16 }
                 : { left: insets.left + 16 },
