@@ -1,19 +1,20 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 
 /**
- * The stick is thumb-sized, not hand-sized: it sits in the bottom-left corner
- * of a landscape phone, where anything wider starts eating the arena the
- * player is trying to steer through. The knob keeps its share of the ring so
- * the throw still reads the same.
+ * The ring itself is thumb-sized, not hand-sized — anything wider starts
+ * eating the arena the player is trying to steer through. The knob keeps its
+ * share of the ring so the throw still reads the same.
  */
 const STICK_SIZE = 104;
+const HALF_STICK = STICK_SIZE / 2;
 const KNOB_SIZE = 42;
 const MAX_OFFSET = (STICK_SIZE - KNOB_SIZE) / 2;
 
@@ -36,21 +37,50 @@ type JoystickProps = {
 const ANGLE_EPSILON = 0.025;
 
 /**
- * Snake.io-style joystick: translucent white ring with a solid knob, parked
- * bottom-left. Reports an absolute heading rather than a delta, which is what
- * the server wants — it decides how fast the snake may turn toward it.
+ * Snake.io-style floating joystick: touch down anywhere in the zone and the
+ * translucent ring spawns right under the thumb — it doesn't sit parked at a
+ * fixed spot. Drag from there to steer, same as before; lift off and it fades
+ * out, ready to reappear wherever the next touch lands. Reports an absolute
+ * heading rather than a delta, which is what the server wants — it decides
+ * how fast the snake may turn toward it.
  *
- * The knob is driven by Reanimated shared values so dragging never re-renders
- * React. Touch events arrive at up to 120Hz; calling setState on each one was
- * competing with the render loop for the JS thread.
+ * The ring/knob are driven by Reanimated shared values so dragging never
+ * re-renders React. Touch events arrive at up to 120Hz; calling setState on
+ * each one was competing with the render loop for the JS thread. The zone's
+ * own size (needed to clamp the ring so it never spawns half off-screen) is
+ * measured once via onLayout and handed to the worklets as a shared value.
  */
 export function Joystick({ onAngle }: JoystickProps) {
+  const zoneSize = useSharedValue({ width: STICK_SIZE, height: STICK_SIZE });
+  const baseX = useSharedValue(0);
+  const baseY = useSharedValue(0);
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
+  const opacity = useSharedValue(0);
   const lastSent = useSharedValue(999);
 
+  const onLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const { width, height } = e.nativeEvent.layout;
+      zoneSize.value = { width, height };
+    },
+    [zoneSize]
+  );
+
+  const ringStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [
+      { translateX: baseX.value - HALF_STICK },
+      { translateY: baseY.value - HALF_STICK },
+    ],
+  }));
+
   const knobStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: tx.value }, { translateY: ty.value }],
+    opacity: opacity.value,
+    transform: [
+      { translateX: baseX.value - KNOB_SIZE / 2 + tx.value },
+      { translateY: baseY.value - KNOB_SIZE / 2 + ty.value },
+    ],
   }));
 
   const pan = useMemo(
@@ -59,44 +89,58 @@ export function Joystick({ onAngle }: JoystickProps) {
         .minDistance(0)
         .onBegin((e) => {
           'worklet';
-          moveKnob(e.x, e.y, tx, ty, lastSent, onAngle);
+          // The ring spawns centred on the touch, clamped so it never spills
+          // past the zone's own edge.
+          const { width, height } = zoneSize.value;
+          baseX.value = clamp(e.x, HALF_STICK, width - HALF_STICK);
+          baseY.value = clamp(e.y, HALF_STICK, height - HALF_STICK);
+          tx.value = 0;
+          ty.value = 0;
+          opacity.value = 1;
         })
         .onUpdate((e) => {
           'worklet';
-          moveKnob(e.x, e.y, tx, ty, lastSent, onAngle);
+          moveKnob(e.x - baseX.value, e.y - baseY.value, tx, ty, lastSent, onAngle);
         })
         .onFinalize(() => {
           'worklet';
           // Heading is intentionally left where it was: releasing the stick
-          // means "keep going", not "stop".
+          // means "keep going", not "stop". The ring itself fades out —
+          // the next touch anywhere in the zone respawns it there.
+          opacity.value = withTiming(0, { duration: 150 });
           tx.value = 0;
           ty.value = 0;
         }),
-    [tx, ty, lastSent, onAngle]
+    [zoneSize, baseX, baseY, tx, ty, opacity, lastSent, onAngle]
   );
 
   return (
     <GestureDetector gesture={pan}>
-      <View style={styles.stickBase}>
-        <View style={styles.stickRing} />
-        <Animated.View style={[styles.knob, knobStyle]} />
+      <View style={styles.zone} onLayout={onLayout}>
+        <Animated.View pointerEvents="none" style={[styles.stickRingFloating, ringStyle]} />
+        <Animated.View pointerEvents="none" style={[styles.knob, knobStyle]} />
       </View>
     </GestureDetector>
   );
 }
 
+/** Keeps the spawned ring's centre inside [min, max] on one axis. */
+function clamp(v: number, min: number, max: number) {
+  'worklet';
+  if (max < min) return (min + max) / 2; // zone smaller than the ring itself
+  return Math.min(Math.max(v, min), max);
+}
+
 /** Runs on the UI thread. Only crosses to JS when the heading really moved. */
 function moveKnob(
-  px: number,
-  py: number,
+  dx: number,
+  dy: number,
   tx: { value: number },
   ty: { value: number },
   lastSent: { value: number },
   onAngle: (a: number) => void
 ) {
   'worklet';
-  const dx = px - STICK_SIZE / 2;
-  const dy = py - STICK_SIZE / 2;
   const dist = Math.hypot(dx, dy);
   const k = dist > MAX_OFFSET ? MAX_OFFSET / dist : 1;
   tx.value = dx * k;
@@ -157,21 +201,20 @@ export function BoostButton({ onChange, disabled }: BoostProps) {
 }
 
 const styles = StyleSheet.create({
-  stickBase: {
+  // The touch zone itself: sized by the parent (see GameScreen), invisible,
+  // and generous — the ring can spawn anywhere inside it.
+  zone: { flex: 1 },
+  stickRingFloating: {
+    position: 'absolute',
     width: STICK_SIZE,
     height: STICK_SIZE,
     borderRadius: STICK_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  stickRing: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: STICK_SIZE / 2,
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.55)',
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   knob: {
+    position: 'absolute',
     width: KNOB_SIZE,
     height: KNOB_SIZE,
     borderRadius: KNOB_SIZE / 2,

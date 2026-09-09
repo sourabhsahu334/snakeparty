@@ -62,6 +62,14 @@ export function GameScreen() {
     [game]
   );
 
+
+  // The joystick is now a floating stick: it can spawn anywhere the thumb
+  // lands inside this zone rather than sitting parked in the corner. Sized to
+  // roughly a handedness-appropriate half of the screen, clear of the top HUD
+  // row (score/gear/leaderboard) so it can't steal those taps.
+  const stickZoneW = Math.min(width * 0.46, 300);
+  const stickZoneH = Math.min(height - insets.top - 70, 360);
+
   // Landscape leaves ~360dp of height. A full top-10 board runs into the boost
   // pad, so show as many rows as actually fit above it.
   const maxRows = Math.max(3, Math.min(10, Math.floor((height - 150) / 18)));
@@ -214,10 +222,14 @@ export function GameScreen() {
           <View
             style={[
               styles.stick,
-              { bottom: insets.bottom + 44 },
+              {
+                bottom: insets.bottom,
+                width: stickZoneW,
+                height: stickZoneH,
+              },
               controlSide === 'left'
-                ? { left: insets.left + 12 }
-                : { right: insets.right + 12 },
+                ? { left: insets.left }
+                : { right: insets.right },
             ]}
           >
             <Joystick onAngle={onAngle} />

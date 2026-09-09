@@ -39,6 +39,7 @@
     "@types/react": "~19.1.10",
     "babel-preset-expo": "~54.0.12",
     "pngjs": "^3.4.0",
+    "@react-native-community/cli": "latest",
     "typescript": "~5.9.2"
   }
 }
