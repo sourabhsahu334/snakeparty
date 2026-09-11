@@ -492,6 +492,143 @@ export function flamePath(
   return path;
 }
 
+/**
+ * Cached local-space geometry for the two "sculpted" skins that were showing
+ * up as slow — serpent and dragon.
+ *
+ * Every shape above (`dragonScaleInto`, `serpentScaleInto`, `serpentHeadInto`,
+ * ...) takes a centre, a radius and a heading, and every caller in this file
+ * and in GameCanvas was recomputing the same trig and calling into Skia's
+ * path builder fresh every single frame — for a serpent's head that is over
+ * fifty path verbs, for its body one whole extra shape *per scale*, on every
+ * snake wearing the skin, every frame. None of that geometry actually
+ * changes frame to frame: only where it is drawn (position), which way it
+ * faces (heading) and how big it is (radius) do.
+ *
+ * So it is built exactly once, here, at radius 1, centred on the origin,
+ * facing along +X (dx=1, dy=0) — "local space". Reproducing it at an actual
+ * (x, y, r, angle) is then a `canvas.translate/rotate/scale` around one
+ * cached path (see `drawLocalShape`) instead of a fresh set of quadTos, which
+ * is what the geometry functions above are for everywhere except here.
+ */
+function buildUnitPath(build: (path: SkPath) => void): SkPath {
+  const path = Skia.Path.Make();
+  build(path);
+  return path;
+}
+
+/** One dragon-scale row, all its across-positions merged into one shape. */
+export const DRAGON_ROW_UNITS: SkPath[] = DRAGON_COLS.map((row) =>
+  buildUnitPath((p) => {
+    for (const across of row) dragonScaleInto(p, 0, across, 1, 1, 0);
+  })
+);
+
+/**
+ * Serpent scale beds, one merged shape per row — the bed is a single colour
+ * regardless of where across the body it sits, so unlike the plates below it
+ * can be merged into one shape per row.
+ */
+export const SERPENT_BED_ROW_UNITS: SkPath[] = SERPENT_COLS.map((row) =>
+  buildUnitPath((p) => {
+    for (const across of row) serpentScaleInto(p, 0, across, 1, 1, 0);
+  })
+);
+
+/**
+ * Serpent plates, one shape *per* across-position rather than merged by row:
+ * `SERPENT_LIFT` shades each plate by where it sits across the body, so
+ * plates in the same row can land in different colour buckets and can't share
+ * a path the way the single-coloured bed can.
+ */
+export const SERPENT_PLATE_UNITS: SkPath[][] = SERPENT_COLS.map((row) =>
+  row.map((across) =>
+    buildUnitPath((p) => serpentScaleInto(p, 0, across, 1, 1, 0, SERPENT_PLATE))
+  )
+);
+
+/** The dragon head's skull, and its four armour plates merged into one shape. */
+const DRAGON_HEAD_SKULL_UNIT = buildUnitPath((p) => pointedHeadInto(p, 0, 0, 1, 1, 0, 1.15));
+const DRAGON_HEAD_PLATES_UNIT = buildUnitPath((p) => {
+  for (const [fwd, across, size] of [
+    [0.72, 0, 0.72],
+    [-0.05, -0.46, 0.8],
+    [-0.05, 0.46, 0.8],
+    [-0.72, 0, 0.8],
+  ] as const) {
+    dragonScaleInto(p, fwd, across, 1, 1, 0, size);
+  }
+});
+
+/** The serpent head's skull outline, base, ridge plating and gold linework. */
+const SERPENT_HEAD_EDGE_UNIT = buildUnitPath((p) => serpentHeadInto(p, 0, 0, 1, 1, 0, 1.1));
+const SERPENT_HEAD_SKULL_UNIT = buildUnitPath((p) => serpentHeadInto(p, 0, 0, 1, 1, 0, 1.0));
+const SERPENT_HEAD_PLATES: readonly (readonly [number, number, number])[] = [
+  [1.02, 0, 0.28],
+  [0.56, 0, 0.36],
+  [0.04, 0, 0.4],
+  [-0.52, 0, 0.4],
+  [-1.04, 0, 0.34],
+  [0.3, 0.5, 0.26],
+  [-0.34, 0.56, 0.28],
+  [-0.94, 0.46, 0.24],
+  [0.3, -0.5, 0.26],
+  [-0.34, -0.56, 0.28],
+  [-0.94, -0.46, 0.24],
+];
+const SERPENT_HEAD_BED_UNIT = buildUnitPath((p) => {
+  for (const [fwd, across, size] of SERPENT_HEAD_PLATES) serpentScaleInto(p, fwd, across, 1, 1, 0, size);
+});
+const SERPENT_HEAD_SPINE_UNIT = buildUnitPath((p) => {
+  for (const [fwd, across, size] of SERPENT_HEAD_PLATES) {
+    if (across === 0) serpentScaleInto(p, fwd, across, 1, 1, 0, size * 0.72);
+  }
+});
+const SERPENT_HEAD_FLANK_UNIT = buildUnitPath((p) => {
+  for (const [fwd, across, size] of SERPENT_HEAD_PLATES) {
+    if (across !== 0) serpentScaleInto(p, fwd, across, 1, 1, 0, size * 0.72);
+  }
+});
+const SERPENT_HEAD_MARKS_UNIT = buildUnitPath((p) => {
+  for (const side of [1, -1] as const) {
+    for (const [a, c1, b, c2] of SERPENT_MARKS) sweepInto(p, 0, 0, 1, 1, 0, side, a, c1, b, c2);
+  }
+});
+/** Eye tilt is a fixed offset off the heading, so this is local-space too. */
+const SERPENT_EYE_RIMS_UNIT = buildUnitPath((p) => {
+  for (const side of [1, -1] as const) {
+    almondEyeInto(p, 0.34, 0.56 * side, 1, 0.5 * side, 0.46, 0.3);
+  }
+});
+const SERPENT_EYE_BALLS_UNIT = buildUnitPath((p) => {
+  for (const side of [1, -1] as const) {
+    almondEyeInto(p, 0.34, 0.56 * side, 1, 0.5 * side, 0.37, 0.22);
+  }
+});
+const SERPENT_EYE_SLITS_UNIT = buildUnitPath((p) => {
+  for (const side of [1, -1] as const) {
+    almondEyeInto(p, 0.34, 0.56 * side, 1, Math.PI / 2, 0.2, 0.05);
+  }
+});
+
+/** Reproduce a cached local-space shape at an actual (x, y, r, angle). */
+function drawLocalShape(
+  canvas: SkCanvas,
+  path: SkPath,
+  paint: SkPaint,
+  x: number,
+  y: number,
+  r: number,
+  angle: number
+): void {
+  canvas.save();
+  canvas.translate(x, y);
+  canvas.rotate((angle * 180) / Math.PI, 0, 0);
+  canvas.scale(r, r);
+  canvas.drawPath(path, paint);
+  canvas.restore();
+}
+
 type Crown = NonNullable<Skin['crown']>;
 
 /**
@@ -851,24 +988,21 @@ export function drawSnakeHead(
     // The ornamental mask: a broad shield skull, a ridge of plates down the
     // snout, mirrored gold linework, and big slit eyes. Drawn in full here,
     // so the generic eyes at the bottom are skipped.
-    const dx = Math.cos(angle);
-    const dy = Math.sin(angle);
-    const perp = angle + Math.PI / 2;
+    //
+    // Every one of these shapes is fixed geometry — cached once in local
+    // space above, reproduced here with a transform instead of a fresh set
+    // of quadTos. See `drawLocalShape`'s comment for why.
     const sp = skin.serpent;
 
     // The dark edge first, as a slightly larger copy of the skull behind it.
     // A drawn outline would need a stroke paint and a width that holds at
     // every size; a shape behind the shape costs one more path and cannot
     // pick up the hairline seams a stroke does where the curves meet.
-    const edge = Skia.Path.Make();
-    serpentHeadInto(edge, x, y, r, dx, dy, 1.1);
     paints.head.setColor(Skia.Color(sp.outline));
-    canvas.drawPath(edge, paints.head);
+    drawLocalShape(canvas, SERPENT_HEAD_EDGE_UNIT, paints.head, x, y, r, angle);
 
-    const head = Skia.Path.Make();
-    serpentHeadInto(head, x, y, r, dx, dy, 1.0);
     paints.head.setColor(Skia.Color(color));
-    canvas.drawPath(head, paints.head);
+    drawLocalShape(canvas, SERPENT_HEAD_SKULL_UNIT, paints.head, x, y, r, angle);
 
     // Ridge: plates down the midline, shrinking toward the nose so the skull
     // reads as tapering rather than as a slab with discs on it.
@@ -881,54 +1015,16 @@ export function drawSnakeHead(
     //
     // Three columns rather than one. A single row of discs down the midline is
     // a caterpillar; it is the scales *beside* the spine that make a skull.
-    const bed = Skia.Path.Make();
-    const spine = Skia.Path.Make();
-    const flank = Skia.Path.Make();
-    const HEAD_PLATES = [
-      // forward, across, size
-      [1.02, 0, 0.28],
-      [0.56, 0, 0.36],
-      [0.04, 0, 0.4],
-      [-0.52, 0, 0.4],
-      [-1.04, 0, 0.34],
-      [0.3, 0.5, 0.26],
-      [-0.34, 0.56, 0.28],
-      [-0.94, 0.46, 0.24],
-      [0.3, -0.5, 0.26],
-      [-0.34, -0.56, 0.28],
-      [-0.94, -0.46, 0.24],
-    ] as const;
-    for (const [fwd, across, size] of HEAD_PLATES) {
-      const cx = x + dx * r * fwd - dy * r * across;
-      const cy = y + dy * r * fwd + dx * r * across;
-      serpentScaleInto(bed, cx, cy, r, dx, dy, size);
-      serpentScaleInto(
-        across === 0 ? spine : flank,
-        cx,
-        cy,
-        r,
-        dx,
-        dy,
-        size * 0.72
-      );
-    }
     paints.head.setColor(Skia.Color(sp.outline));
-    canvas.drawPath(bed, paints.head);
+    drawLocalShape(canvas, SERPENT_HEAD_BED_UNIT, paints.head, x, y, r, angle);
     paints.head.setColor(Skia.Color(sp.ridge));
-    canvas.drawPath(spine, paints.head);
+    drawLocalShape(canvas, SERPENT_HEAD_SPINE_UNIT, paints.head, x, y, r, angle);
     paints.head.setColor(Skia.Color(shade(sp.ridge, 0.24)));
-    canvas.drawPath(flank, paints.head);
+    drawLocalShape(canvas, SERPENT_HEAD_FLANK_UNIT, paints.head, x, y, r, angle);
 
     // Gold linework, both sides from one description.
-    const marks = Skia.Path.Make();
-    for (const side of [1, -1] as const) {
-      for (const [a, c1, b, c2] of SERPENT_MARKS) {
-        sweepInto(marks, x, y, r, dx, dy, side, a, c1, b, c2);
-      }
-    }
     paints.head.setColor(Skia.Color(sp.marks));
-    canvas.drawPath(marks, paints.head);
-
+    drawLocalShape(canvas, SERPENT_HEAD_MARKS_UNIT, paints.head, x, y, r, angle);
 
     if (crown && FRONT_CROWNS.has(crown.shape)) {
       drawCrown(canvas, crown, x, y, r, angle, paints.crown, paints.crownAccent);
@@ -937,23 +1033,12 @@ export function drawSnakeHead(
     // Eyes: a big tilted almond in the skin's eye colour, rimmed in the same
     // dark the head is edged with, cut by a vertical slit. Vertical meaning
     // across the heading — a snake's slit stands square to the way it looks.
-    const rims = Skia.Path.Make();
-    const balls = Skia.Path.Make();
-    const slits = Skia.Path.Make();
-    for (const side of [1, -1]) {
-      const ex = x + dx * r * 0.34 + Math.cos(perp) * r * 0.56 * side;
-      const ey = y + dy * r * 0.34 + Math.sin(perp) * r * 0.56 * side;
-      const tilt = angle + 0.5 * side;
-      almondEyeInto(rims, ex, ey, r, tilt, 0.46, 0.3);
-      almondEyeInto(balls, ex, ey, r, tilt, 0.37, 0.22);
-      almondEyeInto(slits, ex, ey, r, angle + Math.PI / 2, 0.2, 0.05);
-    }
     paints.head.setColor(Skia.Color(sp.outline));
-    canvas.drawPath(rims, paints.head);
+    drawLocalShape(canvas, SERPENT_EYE_RIMS_UNIT, paints.head, x, y, r, angle);
     paints.head.setColor(Skia.Color(skin.eyeColor ?? '#F5C518'));
-    canvas.drawPath(balls, paints.head);
+    drawLocalShape(canvas, SERPENT_EYE_BALLS_UNIT, paints.head, x, y, r, angle);
     paints.head.setColor(Skia.Color('#141A16'));
-    canvas.drawPath(slits, paints.head);
+    drawLocalShape(canvas, SERPENT_EYE_SLITS_UNIT, paints.head, x, y, r, angle);
 
     // No mouth line and no nostrils. Both are front-view features: from
     // directly above, a mouth crescent across the snout and a pair of dark
@@ -964,34 +1049,12 @@ export function drawSnakeHead(
   } else if (skin?.scales?.style === 'dragon') {
     // Armoured head: the same point as the flames get, with a short row of
     // scutes laid over it so the plating carries all the way to the nose.
-    const head = Skia.Path.Make();
-    pointedHeadInto(head, x, y, r, Math.cos(angle), Math.sin(angle), 1.15);
+    // Cached local-space shapes again — see `drawLocalShape`.
     paints.head.setColor(Skia.Color(color));
-    canvas.drawPath(head, paints.head);
+    drawLocalShape(canvas, DRAGON_HEAD_SKULL_UNIT, paints.head, x, y, r, angle);
 
-    const plates = Skia.Path.Make();
-    const dx = Math.cos(angle);
-    const dy = Math.sin(angle);
-    // Bigger than a body scute: three of them have to plate a whole skull, and
-    // at body size they vanish into it.
-    for (const [fwd, across, size] of [
-      [0.72, 0, 0.72],
-      [-0.05, -0.46, 0.8],
-      [-0.05, 0.46, 0.8],
-      [-0.72, 0, 0.8],
-    ] as const) {
-      dragonScaleInto(
-        plates,
-        x + dx * r * fwd - dy * r * across,
-        y + dy * r * fwd + dx * r * across,
-        r,
-        dx,
-        dy,
-        size
-      );
-    }
     paints.head.setColor(Skia.Color(scaleHighlight(skin, color)));
-    canvas.drawPath(plates, paints.head);
+    drawLocalShape(canvas, DRAGON_HEAD_PLATES_UNIT, paints.head, x, y, r, angle);
   } else if (skin?.smooth) {
     // A polished body deserves a proper head: blunt nose, cheeks, jaw, and the
     // face a real snake wears — dark almond eyes lit by a thin slit, nostrils

@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GameCanvas } from '../game/GameCanvas';
 import { BoostButton, Joystick } from '../game/Controls';
+import { Countdown } from '../game/Countdown';
 import { useGame } from '../game/useGameSocket';
 import { SoloSetupSheet } from './SoloSetupSheet';
 import type { SoloSettings } from '../game/soloSettings';
@@ -53,13 +54,42 @@ export function GameScreen() {
     setDraft(game.soloSettings);
   }, [game]);
 
+  // Solo-only "3, 2, 1" beat before the snake is actually let go: `runCountdown`
+  // holds the action to run once it hits zero, `counting` drives the overlay.
+  // The sim is already paused whenever this fires — on a fresh run below, and
+  // on the pause sheet's own `pauseSolo()` call — so nothing moves underneath
+  // it either way.
+  const [counting, setCounting] = useState(false);
+  const pendingRef = useRef<(() => void) | null>(null);
+  const runCountdown = useCallback((after: () => void) => {
+    pendingRef.current = after;
+    setCounting(true);
+  }, []);
+  const onCountdownDone = useCallback(() => {
+    setCounting(false);
+    pendingRef.current?.();
+    pendingRef.current = null;
+  }, []);
+
+  // A run just started: freeze it immediately and only let it go once the
+  // countdown finishes. Fires once per run — GameScreen stays mounted across
+  // a death/respawn, so this doesn't retrigger there.
+  useEffect(() => {
+    if (!solo) return;
+    game.pauseSolo();
+    runCountdown(() => game.resumeSolo());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const resume = useCallback(
     (next: SoloSettings | null) => {
       setDraft(null);
       if (next) saveSoloSettings(next);
-      game.resumeSolo(next ?? undefined);
+      // Still paused from openSettings — hold it there through the countdown
+      // rather than letting the snake move the instant the sheet closes.
+      runCountdown(() => game.resumeSolo(next ?? undefined));
     },
-    [game]
+    [game, runCountdown]
   );
 
 
@@ -250,6 +280,10 @@ export function GameScreen() {
           </View>
         </>
       )}
+
+      {/* Rendered last so it sits above the controls, the gear icon, and the
+          pause sheet alike — nothing underneath is reachable mid-count. */}
+      {counting && <Countdown seconds={3} onDone={onCountdownDone} />}
     </View>
   );
 }

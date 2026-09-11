@@ -20,6 +20,7 @@ import {
   BEAD_PITCH,
   DRAGON_COLS,
   DRAGON_ROW_PITCH,
+  DRAGON_ROW_UNITS,
   FLAME_PITCH,
   SMOOTH_SCALE_COLS,
   SMOOTH_SCALE_PITCH,
@@ -27,12 +28,11 @@ import {
   SCALE_OFFSET,
   SCALE_PITCH,
   SCALE_RADIUS,
+  SERPENT_BED_ROW_UNITS,
   SERPENT_COLS,
   SERPENT_LIFT,
-  SERPENT_PLATE,
+  SERPENT_PLATE_UNITS,
   SERPENT_ROW_PITCH,
-  dragonScaleInto,
-  serpentScaleInto,
   fineScaleInto,
   drawSnakeHead,
   flameInto,
@@ -73,7 +73,15 @@ type Props = {
   showFps?: boolean;
 };
 
-type Label = { id: number; name: string; x: number; y: number; isLocal: boolean };
+type Label = {
+  id: number;
+  name: string;
+  /** Undefined only if the snake somehow has no skin resolved at all. */
+  skin: string | undefined;
+  x: number;
+  y: number;
+  isLocal: boolean;
+};
 
 /**
  * Bake the hex lattice — plus the arena colour behind it — into one opaque
@@ -191,6 +199,11 @@ export function GameCanvas({ sim, width, height, showFps }: Props) {
       fade: fill(),
     };
   }, []) satisfies HeadPaints & Record<string, SkPaint>;
+
+  // One mutable matrix, reused for every dragon/serpent scale on every snake
+  // on every frame — see the scale-drawing block below for why this replaces
+  // calling into the scale shape builders fresh per bead.
+  const scaleMatrix = useMemo(() => Skia.Matrix(), []);
 
   useEffect(() => {
     paints.outline.setColor(Skia.Color('rgba(0,45,65,0.22)'));
@@ -508,37 +521,39 @@ export function GameCanvas({ sim, width, height, showFps }: Props) {
                 path = Skia.Path.Make();
                 byScale.set(c, path);
               }
-              if (dragon) {
-                // Across the body, not just along it: each row is a handful of
-                // scales sitting side by side, offset from the row behind.
-                for (const across of DRAGON_COLS[row % DRAGON_COLS.length]) {
-                  dragonScaleInto(
-                    path,
-                    xs[k] - dy * r * across,
-                    ys[k] + dx * r * across,
-                    r,
-                    dx,
-                    dy
-                  );
-                }
-                row++;
-              } else if (serpent) {
-                // Plates carry the bead's own colour, lit by where they sit
-                // across the body — not the scale highlight the other styles
-                // use, which would flatten the spine back out again.
-                const base = colors[i] ?? s.color;
-                for (const across of SERPENT_COLS[row % SERPENT_COLS.length]) {
-                  const px2 = xs[k] - dy * r * across;
-                  const py2 = ys[k] + dx * r * across;
-                  serpentScaleInto(bed!, px2, py2, r, dx, dy);
-                  const lift = SERPENT_LIFT(across);
-                  const pc = lift >= 0 ? lighten(base, lift) : shade(base, -lift);
-                  let plate = byPlate!.get(pc);
-                  if (!plate) {
-                    plate = Skia.Path.Make();
-                    byPlate!.set(pc, plate);
+              if (dragon || serpent) {
+                // Both styles reuse a cached, pre-built scale shape (see
+                // snakeArt.ts) instead of recomputing the trig and re-walking
+                // Skia's path builder for it on every bead of every frame —
+                // `addPath` with a transform just copies the shape's existing
+                // verbs into place, which is what actually costs the frame
+                // rate at this call volume. One matrix is built per bead and
+                // shared across however many shapes land on it.
+                const theta = Math.atan2(dy, dx);
+                scaleMatrix.identity().translate(xs[k], ys[k]).rotate(theta).scale(r, r);
+                if (dragon) {
+                  // Across the body, not just along it: each row is a handful
+                  // of scales sitting side by side, offset from the row behind.
+                  path.addPath(DRAGON_ROW_UNITS[row % DRAGON_ROW_UNITS.length], scaleMatrix);
+                } else {
+                  // Plates carry the bead's own colour, lit by where they sit
+                  // across the body — not the scale highlight the other styles
+                  // use, which would flatten the spine back out again.
+                  const base = colors[i] ?? s.color;
+                  const rowIdx = row % SERPENT_COLS.length;
+                  bed!.addPath(SERPENT_BED_ROW_UNITS[rowIdx], scaleMatrix);
+                  const acrossList = SERPENT_COLS[rowIdx];
+                  const plateUnits = SERPENT_PLATE_UNITS[rowIdx];
+                  for (let a = 0; a < acrossList.length; a++) {
+                    const lift = SERPENT_LIFT(acrossList[a]);
+                    const pc = lift >= 0 ? lighten(base, lift) : shade(base, -lift);
+                    let plate = byPlate!.get(pc);
+                    if (!plate) {
+                      plate = Skia.Path.Make();
+                      byPlate!.set(pc, plate);
+                    }
+                    plate.addPath(plateUnits[a], scaleMatrix);
                   }
-                  serpentScaleInto(plate, px2, py2, r, dx, dy, SERPENT_PLATE);
                 }
                 row++;
               } else {
@@ -645,8 +660,12 @@ export function GameCanvas({ sim, width, height, showFps }: Props) {
             .map((s) => ({
               id: s.id,
               name: s.name,
+              skin: s.skin?.name,
               x: sx(s.head.x),
-              y: sy(s.head.y) - s.radius * scale - 15,
+              // 11px taller than a bare name needs, to leave room for the
+              // skin-name line underneath without creeping toward the head
+              // (and whatever crown or ears it's wearing).
+              y: sy(s.head.y) - s.radius * scale - 26,
               isLocal: s.isLocal,
             }))
             .filter((l) => l.x > -70 && l.x < width + 70 && l.y > -25 && l.y < height + 25)
@@ -667,7 +686,7 @@ export function GameCanvas({ sim, width, height, showFps }: Props) {
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [sim, width, height, scale, background, paints, periodX, periodY, showFps, headArt]);
+  }, [sim, width, height, scale, background, paints, scaleMatrix, periodX, periodY, showFps, headArt]);
 
   return (
     <View style={[styles.root, { width, height }]}>
@@ -676,16 +695,19 @@ export function GameCanvas({ sim, width, height, showFps }: Props) {
       </Canvas>
 
       {labels.map((l) => (
-        <Text
-          key={l.id}
-          numberOfLines={1}
-          style={[
-            styles.nameplate,
-            { left: l.x - 70, top: l.y, color: l.isLocal ? '#FFF9C4' : '#FFFFFF' },
-          ]}
-        >
-          {l.name}
-        </Text>
+        <View key={l.id} pointerEvents="none" style={[styles.labelWrap, { left: l.x - 70, top: l.y }]}>
+          <Text
+            numberOfLines={1}
+            style={[styles.nameplate, { color: l.isLocal ? '#FFF9C4' : '#FFFFFF' }]}
+          >
+            {l.name}
+          </Text>
+          {l.skin && (
+            <Text numberOfLines={1} style={styles.skinLabel}>
+              {l.skin}
+            </Text>
+          )}
+        </View>
       ))}
 
       {showFps && <Text style={styles.fps}>{fps} fps</Text>}
@@ -695,14 +717,24 @@ export function GameCanvas({ sim, width, height, showFps }: Props) {
 
 const styles = StyleSheet.create({
   root: { overflow: 'hidden', backgroundColor: theme.arena },
+  // Anchors the name + skin pair as one block; each Text just stacks inside it.
+  labelWrap: { position: 'absolute', width: 140, alignItems: 'center' },
   nameplate: {
-    position: 'absolute',
-    width: 140,
     textAlign: 'center',
     fontSize: 10.5,
     fontWeight: '500',
     // The shadow stays: it is what keeps a light weight readable over a busy
     // arena, and it is doing the work the bold used to.
+    textShadowColor: 'rgba(6,44,60,0.95)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2.5,
+  },
+  // Dimmer and smaller than the name — it's a caption, not a second identity.
+  skinLabel: {
+    textAlign: 'center',
+    fontSize: 9,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.72)',
     textShadowColor: 'rgba(6,44,60,0.95)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2.5,
