@@ -27,6 +27,19 @@ const GRADIENT_STEPS = 6;
  */
 const GRADIENT_SPAN = 46;
 
+/**
+ * How many beads a banded skin's colour holds for before the pattern moves
+ * on to the next one.
+ *
+ * A single-colour pattern doesn't care, but anything with more than one
+ * colour needs this to be more than 1 bead — alternating every single bead
+ * doesn't read as a pattern, it reads as flicker on a moving body. Fixed
+ * rather than per-skin: one constant every banded skin agrees on is enough
+ * to turn a pattern into a visible stripe, and it's one fewer thing for a new
+ * skin's data to have to get right.
+ */
+const STRIPE_WIDTH = 3;
+
 export function beadColors(
   skin: Skin | undefined,
   baseColor: string,
@@ -38,9 +51,7 @@ export function beadColors(
   // replaces this one at game_start, so the same id can carry different stops
   // in the picker and in the round — keying on the id alone let whichever ran
   // first pin the colours for the other.
-  const key = `${id}|${skin?.mode ?? ''}|${skin?.band ?? ''}|${
-    skin?.pattern?.join(',') ?? ''
-  }|${baseColor}|${beads}`;
+  const key = `${id}|${skin?.mode ?? ''}|${skin?.pattern?.join(',') ?? ''}|${baseColor}|${beads}`;
   const hit = cache.get(key);
   if (hit) return hit;
 
@@ -68,10 +79,9 @@ function build(skin: Skin | undefined, baseColor: string, beads: number): string
     });
   }
 
-  const band = Math.max(1, skin?.band ?? 1);
   return Array.from(
     { length: beads },
-    (_, i) => pattern[Math.floor(i / band) % pattern.length]
+    (_, i) => pattern[Math.floor(i / STRIPE_WIDTH) % pattern.length]
   );
 }
 

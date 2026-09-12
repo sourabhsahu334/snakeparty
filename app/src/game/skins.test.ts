@@ -5,8 +5,8 @@ import { beadColors, scaleHighlight } from './skins';
 import { LOCAL_SKINS } from './skins.catalog';
 import type { Skin } from './protocol';
 
-const classic: Skin = { id: 'classic', name: 'Classic', desc: '', mode: 'bands', pattern: null, band: 1 };
-const bumble: Skin = { id: 'bumble', name: 'Bumble', desc: '', mode: 'bands', pattern: ['#FFC300', '#2B2B2B'], band: 3 };
+const classic: Skin = { id: 'classic', name: 'Classic', desc: '', mode: 'bands', pattern: null };
+const bumble: Skin = { id: 'bumble', name: 'Bumble', desc: '', mode: 'bands', pattern: ['#FFC300', '#2B2B2B'] };
 const ember: Skin = { id: 'ember', name: 'Ember', desc: '', mode: 'gradient', pattern: ['#FFE066', '#C81D11'] };
 
 test('classic wears the colour the player picked', () => {
@@ -15,7 +15,7 @@ test('classic wears the colour the player picked', () => {
   assert.ok(c.every((x) => x === '#3FA9F5'));
 });
 
-test('bands repeat the pattern, `band` beads at a time', () => {
+test('bands repeat the pattern in fixed-width stripes', () => {
   const c = beadColors(bumble, '#000000', 12);
   assert.deepStrictEqual(c.slice(0, 3), ['#FFC300', '#FFC300', '#FFC300']);
   assert.deepStrictEqual(c.slice(3, 6), ['#2B2B2B', '#2B2B2B', '#2B2B2B']);
@@ -34,8 +34,8 @@ test('a gradient runs head to tail and is quantised for cheap drawing', () => {
 });
 
 test('two skins sharing an id but not a pattern do not share cached colours', () => {
-  const a: Skin = { id: 'dup', name: 'A', desc: '', mode: 'bands', pattern: ['#FF0000'], band: 1 };
-  const b: Skin = { id: 'dup', name: 'B', desc: '', mode: 'bands', pattern: ['#00FF00'], band: 1 };
+  const a: Skin = { id: 'dup', name: 'A', desc: '', mode: 'bands', pattern: ['#FF0000'] };
+  const b: Skin = { id: 'dup', name: 'B', desc: '', mode: 'bands', pattern: ['#00FF00'] };
   assert.strictEqual(beadColors(a, '#000000', 4)[0], '#FF0000');
   assert.strictEqual(beadColors(b, '#000000', 4)[0], '#00FF00', 'served the other skin from cache');
 });

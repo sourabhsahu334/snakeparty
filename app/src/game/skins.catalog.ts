@@ -12,7 +12,6 @@ export const LOCAL_SKINS: Skin[] = [
     "desc": "Plain and quick. Uses whichever colour you pick.",
     "mode": "bands",
     "pattern": null,
-    "band": 1
   },
   {
     "id": "ember",
@@ -37,7 +36,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#FFC300",
       "#2B2B2B"
     ],
-    "band": 3
   },
   {
     "id": "tiger",
@@ -50,7 +48,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#FF8A1E",
       "#2B2B2B"
     ],
-    "band": 2
   },
   {
     "id": "panda",
@@ -63,7 +60,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#F7F7F7",
       "#2B2B2B"
     ],
-    "band": 3,
     "ears": {
       "shape": "round",
       "color": "#2B2B2B"
@@ -80,7 +76,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#FFFFFF",
       "#FFF0F3"
     ],
-    "band": 4,
     "ears": {
       "shape": "long",
       "color": "#FFFFFF",
@@ -98,7 +93,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#3A3F47",
       "#2B2B2B"
     ],
-    "band": 3,
     "ears": {
       "shape": "pointed",
       "color": "#3A3F47",
@@ -119,7 +113,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#2B2B2B",
       "#FFFFFF"
     ],
-    "band": 2,
     "ears": {
       "shape": "round",
       "color": "#F2AFC4"
@@ -136,7 +129,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#9BE564",
       "#1F3A17"
     ],
-    "band": 2
   },
   {
     "id": "candy",
@@ -148,7 +140,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#FF6FB5",
       "#FFFFFF"
     ],
-    "band": 2
   },
   {
     "id": "galaxy",
@@ -199,7 +190,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#FF7B00",
       "#2B2B2B"
     ],
-    "band": 2
   },
   {
     "id": "ghost",
@@ -228,7 +218,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#3FA9F5",
       "#7B2CBF"
     ],
-    "band": 2
   },
   {
     "id": "rex",
@@ -240,7 +229,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#ABD144",
       "#86B22D"
     ],
-    "band": 3,
     "scales": {},
     "belly": "#E4E897",
     "crown": {
@@ -260,7 +248,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#C63756",
       "#B02F4B"
     ],
-    "band": 3,
     "scales": {},
     "crown": {
       "shape": "horns",
@@ -279,7 +266,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#2E9E6B",
       "#1F7A50"
     ],
-    "band": 3,
     "scales": {},
     "belly": "#D8E8B0",
     "crown": {
@@ -318,7 +304,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#F0CB57",
       "#D9A32B"
     ],
-    "band": 2,
     "scales": {
       "tint": "#F6DE9A"
     },
@@ -373,7 +358,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#FBFBFC",
       "#CBD4D5"
     ],
-    "band": 3,
     "belly": "#E6EAEB",
     "crown": {
       "shape": "plume",
@@ -391,7 +375,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#EDEBE3",
       "#FECB00"
     ],
-    "band": 2,
     "crown": {
       "shape": "visor",
       "color": "#FECB00",
@@ -408,7 +391,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#E90000",
       "#F9F9FA"
     ],
-    "band": 3,
     "belly": "#F9F9FA",
     "crown": {
       "shape": "hat",
@@ -426,7 +408,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#477D85",
       "#3A3F5E"
     ],
-    "band": 3,
     "belly": "#E9B5A3",
     "crown": {
       "shape": "plume",
@@ -445,7 +426,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#3A3F5E",
       "#1B2447"
     ],
-    "band": 3,
     "belly": "#E9B5A3",
     "crown": {
       "shape": "topknot",
@@ -464,7 +444,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#2B2B45",
       "#3B2027"
     ],
-    "band": 3,
     "belly": "#E9B5A3",
     "crown": {
       "shape": "topknot",
@@ -482,7 +461,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#4A2323",
       "#753C3C"
     ],
-    "band": 3,
     "belly": "#FE6767",
     "crown": {
       "shape": "plume",
@@ -501,7 +479,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#14182E",
       "#7D3833"
     ],
-    "band": 3,
     "crown": {
       "shape": "beak",
       "color": "#AB5130"
@@ -518,7 +495,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#7D3833",
       "#DFE0E8"
     ],
-    "band": 3,
     "crown": {
       "shape": "beak",
       "color": "#DFE0E8",
@@ -535,7 +511,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#FFEE83",
       "#FFAE70"
     ],
-    "band": 3,
     "belly": "#FFF6C9",
     "ears": {
       "shape": "pointed",
@@ -591,7 +566,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#3D4BC4",
       "#6FCBFF"
     ],
-    "band": 2,
     "scales": {
       "tint": "#A6EEFF"
     },
@@ -614,7 +588,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#F4A300",
       "#1D3557"
     ],
-    "band": 2,
     "crown": {
       "shape": "visor",
       "color": "#1D3557",
@@ -631,7 +604,6 @@ export const LOCAL_SKINS: Skin[] = [
       "#6F8B3E",
       "#5A7433"
     ],
-    "band": 3,
     "scales": {
       "tint": "#DCCFA2",
       "style": "dragon"
@@ -680,30 +652,29 @@ export const LOCAL_SKINS: Skin[] = [
       "center": "#E9A0B4"
     }
   },
-  {
-    "id": "basilisk",
-    "group": "beasts",
-    "name": "Basilisk",
-    "desc": "Green on green on gold. Watches you back.",
-    "mode": "bands",
-    "pattern": [
-      "#2CA04B",
-      "#0F7038",
-      "#63B840",
-      "#2CA04B",
-      "#E9B824"
-    ],
-    "band": 2,
-    "scales": {
-      "style": "serpent"
-    },
-    "eyes": "slit",
-    "eyeColor": "#F5C518",
-    "serpent": {
-      "marks": "#F2C230",
-      "ridge": "#7CC93F",
-      "outline": "#0A4A26"
-    },
-    "headArt": "basilisk"
-  }
+  // {
+  //   "id": "basilisk",
+  //   "group": "beasts",
+  //   "name": "Basilisk",
+  //   "desc": "Green on green on gold. Watches you back.",
+  //   "mode": "bands",
+  //   "pattern": [
+  //     "#2CA04B",
+  //     "#0F7038",
+  //     "#63B840",
+  //     "#2CA04B",
+  //     "#E9B824"
+  //   ],
+  //   "scales": {
+  //     "style": "serpent"
+  //   },
+  //   "eyes": "slit",
+  //   "eyeColor": "#F5C518",
+  //   "serpent": {
+  //     "marks": "#F2C230",
+  //     "ridge": "#7CC93F",
+  //     "outline": "#0A4A26"
+  //   },
+  //   "headArt": "basilisk"
+  // }
 ] as Skin[];

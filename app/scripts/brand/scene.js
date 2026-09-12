@@ -103,9 +103,11 @@ function beadColors(sk, baseColor, beads) {
       return steps[Math.min(STEPS - 1, Math.round(t * (STEPS - 1)))];
     });
   }
-  const band = Math.max(1, (sk && sk.band) || 1);
+  // Same fixed stripe width as skins.ts — alternating every single bead
+  // reads as flicker, not a pattern.
+  const STRIPE_WIDTH = 3;
   return Array.from({ length: beads }, function (_, i) {
-    return pattern[Math.floor(i / band) % pattern.length];
+    return pattern[Math.floor(i / STRIPE_WIDTH) % pattern.length];
   });
 }
 

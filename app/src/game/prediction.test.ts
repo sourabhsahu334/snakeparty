@@ -35,8 +35,8 @@ function advanceFrames(
 const PALETTE = ['#FF9E2C', '#FF4FA3', '#7ED321', '#3FA9F5', '#B06AB3'];
 
 const SKINS = [
-  { id: 'classic', name: 'Classic', desc: '', mode: 'bands' as const, pattern: null, band: 1 },
-  { id: 'bumble', name: 'Bumble', desc: '', mode: 'bands' as const, pattern: ['#FFC300', '#2B2B2B'], band: 3 },
+  { id: 'classic', name: 'Classic', desc: '', mode: 'bands' as const, pattern: null },
+  { id: 'bumble', name: 'Bumble', desc: '', mode: 'bands' as const, pattern: ['#FFC300', '#2B2B2B'] },
   { id: 'ember', name: 'Ember', desc: '', mode: 'gradient' as const, pattern: ['#FFE066', '#C81D11'] },
 ];
 

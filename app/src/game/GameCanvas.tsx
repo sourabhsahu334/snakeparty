@@ -46,8 +46,13 @@ import { theme } from '../lib/theme';
  * World units across the screen's LONG edge. Keying off the long edge rather
  * than the width keeps a snake the same on-screen size whichever way the phone
  * is held, so the game reads identically in landscape and portrait.
+ *
+ * Kept comfortably under what the server (and solo's local mirror of it,
+ * SOLO_RULES) actually sends the client — VIEW_WIDTH/VIEW_HEIGHT plus
+ * VIEW_MARGIN in config.js/soloGame.ts — or zooming out would just show more
+ * blank arena at the edges where snakes and food haven't arrived yet.
  */
-const VIEW_LONG = 760;
+const VIEW_LONG = 900;
 /**
  * Hard ceiling on beads walked per snake, as a last line of defence.
  *

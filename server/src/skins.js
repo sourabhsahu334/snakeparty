@@ -13,7 +13,7 @@
  *       simulation reads it.
  *
  * mode:
- *   'bands'    repeat `pattern` along the body, `band` beads per colour
+ *   'bands'    repeat `pattern` along the body, one bead per colour
  *   'gradient' blend across `pattern` from head to tail
  *
  * ears: drawn on the head. 'round' = panda/mouse, 'pointed' = cat/fox,
@@ -84,7 +84,6 @@ const SKINS = [
   //   desc: 'Plain and quick. Uses whichever colour you pick.',
   //   mode: 'bands',
   //   pattern: null, // filled in from the player's chosen colour
-  //   band: 1,
   // },
   {
     id: 'ember',
@@ -101,7 +100,6 @@ const SKINS = [
   //   desc: 'Small, loud, and best left alone.',
   //   mode: 'bands',
   //   pattern: ['#FFC300', '#2B2B2B'],
-  //   band: 3,
   // },
   // {
   //   id: 'tiger',
@@ -110,7 +108,6 @@ const SKINS = [
   //   desc: 'Stripes earned the hard way.',
   //   mode: 'bands',
   //   pattern: ['#FF8A1E', '#FF8A1E', '#2B2B2B'],
-  //   band: 2,
   // },
   // {
   //   id: 'panda',
@@ -119,7 +116,6 @@ const SKINS = [
   //   desc: 'Looks harmless. Is not.',
   //   mode: 'bands',
   //   pattern: ['#F7F7F7', '#F7F7F7', '#2B2B2B'],
-  //   band: 3,
   //   ears: { shape: 'round', color: '#2B2B2B' },
   //   belly: '#FFFFFF',
   // },
@@ -130,7 +126,6 @@ const SKINS = [
   //   desc: 'Hops between snacks.',
   //   mode: 'bands',
   //   pattern: ['#FFFFFF', '#FFF0F3'],
-  //   band: 4,
   //   ears: { shape: 'long', color: '#FFFFFF', inner: '#FFAFC5' },
   //   belly: '#FFFFFF',
   // },
@@ -141,7 +136,6 @@ const SKINS = [
   //   desc: 'Nine lives, one arena.',
   //   mode: 'bands',
   //   pattern: ['#3A3F47', '#2B2B2B'],
-  //   band: 3,
   //   ears: { shape: 'pointed', color: '#3A3F47', inner: '#FF9EB5' },
   // },
   // {
@@ -151,7 +145,6 @@ const SKINS = [
   //   desc: 'Grazes on whatever is nearest.',
   //   mode: 'bands',
   //   pattern: ['#FFFFFF', '#FFFFFF', '#2B2B2B', '#FFFFFF', '#2B2B2B', '#FFFFFF'],
-  //   band: 2,
   //   ears: { shape: 'round', color: '#F2AFC4' },
   //   belly: '#FFFFFF',
   // },
@@ -162,7 +155,6 @@ const SKINS = [
   //   desc: 'Do not eat.',
   //   mode: 'bands',
   //   pattern: ['#9BE564', '#1F3A17'],
-  //   band: 2,
   // },
   // {
   //   id: 'candy',
@@ -171,7 +163,6 @@ const SKINS = [
   //   desc: 'Sweet right up until it isn’t.',
   //   mode: 'bands',
   //   pattern: ['#FF6FB5', '#FFFFFF'],
-  //   band: 2,
   // },
   {
     id: 'galaxy',
@@ -204,7 +195,6 @@ const SKINS = [
   //   desc: 'Cooling on the outside only.',
   //   mode: 'bands',
   //   pattern: ['#FF4800', '#2B2B2B', '#FF7B00', '#2B2B2B'],
-  //   band: 2,
   // },
   {
     id: 'ghost',
@@ -222,7 +212,6 @@ const SKINS = [
   //   desc: 'Every colour, all at once.',
   //   mode: 'bands',
   //   pattern: ['#FF5E5B', '#FF9E2C', '#FFD93D', '#7ED321', '#3FA9F5', '#7B2CBF'],
-  //   band: 2,
   // },
 
   // ---- drawn from the sprite sheets in app/assets/assets ------------------
@@ -236,7 +225,6 @@ const SKINS = [
   //   desc: 'Small arms. Big opinions.',
   //   mode: 'bands',
   //   pattern: ['#ABD144', '#86B22D'],
-  //   band: 3,
   //   scales: {},
   //   belly: '#E4E897',
   //   crown: { shape: 'snout', color: '#E4E897', accent: '#5F8020' },
@@ -249,7 +237,6 @@ const SKINS = [
   //   desc: 'Crimson scales, gold on the wing.',
   //   mode: 'bands',
   //   pattern: ['#C63756', '#B02F4B'],
-  //   band: 3,
   //   scales: {},
   //   crown: { shape: 'horns', color: '#E6D958' },
   //   eyes: 'slit',
@@ -261,7 +248,6 @@ const SKINS = [
   //   desc: 'Older than the arena. Unimpressed by it.',
   //   mode: 'bands',
   //   pattern: ['#2E9E6B', '#2E9E6B', '#1F7A50'],
-  //   band: 3,
   //   scales: {},
   //   belly: '#D8E8B0',
   //   crown: { shape: 'horns', color: '#E8D98A' },
@@ -285,7 +271,6 @@ const SKINS = [
   //   desc: 'A hoard with a snake wrapped round it.',
   //   mode: 'bands',
   //   pattern: ['#F0CB57', '#D9A32B'],
-  //   band: 2,
   //   scales: { tint: '#F6DE9A' },
   //   crown: { shape: 'horns', color: '#F5E3A1' },
   //   eyes: 'slit',
@@ -317,7 +302,6 @@ const SKINS = [
   //   desc: 'Polished this morning. Dented by lunch.',
   //   mode: 'bands',
   //   pattern: ['#FBFBFC', '#CBD4D5'],
-  //   band: 3,
   //   belly: '#E6EAEB',
   //   crown: { shape: 'plume', color: '#C70000', accent: '#FFFD00' },
   // },
@@ -328,7 +312,6 @@ const SKINS = [
   //   desc: 'No eyes. Sees everything.',
   //   mode: 'bands',
   //   pattern: ['#EDEBE3', '#FECB00'],
-  //   band: 2,
   //   crown: { shape: 'visor', color: '#FECB00', accent: '#E01B1B' },
   // },
   // {
@@ -338,7 +321,6 @@ const SKINS = [
   //   desc: 'Knows exactly which of you has been good.',
   //   mode: 'bands',
   //   pattern: ['#E90000', '#F9F9FA'],
-  //   band: 3,
   //   belly: '#F9F9FA',
   //   crown: { shape: 'hat', color: '#E90000', accent: '#F9F9FA' },
   // },
@@ -349,7 +331,6 @@ const SKINS = [
   //   desc: 'Leads with the hair.',
   //   mode: 'bands',
   //   pattern: ['#477D85', '#3A3F5E'],
-  //   band: 3,
   //   belly: '#E9B5A3',
   //   crown: { shape: 'plume', color: '#FA6A0A', accent: '#F9A31B' },
   // },
@@ -360,7 +341,6 @@ const SKINS = [
   //   desc: 'Serves nobody. Turns beautifully.',
   //   mode: 'bands',
   //   pattern: ['#242234', '#3A3F5E', '#1B2447'],
-  //   band: 3,
   //   belly: '#E9B5A3',
   //   crown: { shape: 'topknot', color: '#242234', accent: '#B3B9D1' },
   // },
@@ -371,7 +351,6 @@ const SKINS = [
   //   desc: 'Was behind you a moment ago.',
   //   mode: 'bands',
   //   pattern: ['#283540', '#2B2B45', '#3B2027'],
-  //   band: 3,
   //   belly: '#E9B5A3',
   //   crown: { shape: 'topknot', color: '#3B2027', accent: '#B9BFFB' },
   // },
@@ -382,7 +361,6 @@ const SKINS = [
   //   desc: 'The mask is the whole personality.',
   //   mode: 'bands',
   //   pattern: ['#4A2323', '#753C3C'],
-  //   band: 3,
   //   belly: '#FE6767',
   //   crown: { shape: 'plume', color: '#351919', accent: '#FEE6AC' },
   // },
@@ -393,7 +371,6 @@ const SKINS = [
   //   desc: 'Crow tengu. Takes what it likes.',
   //   mode: 'bands',
   //   pattern: ['#242234', '#14182E', '#7D3833'],
-  //   band: 3,
   //   crown: { shape: 'beak', color: '#AB5130' },
   // },
   // {
@@ -403,7 +380,6 @@ const SKINS = [
   //   desc: 'Came down off the mountain for this.',
   //   mode: 'bands',
   //   pattern: ['#242234', '#7D3833', '#DFE0E8'],
-  //   band: 3,
   //   crown: { shape: 'beak', color: '#DFE0E8', accent: '#4C6885' },
   // },
   // {
@@ -413,7 +389,6 @@ const SKINS = [
   //   desc: 'Nine tails, and only one of them is here.',
   //   mode: 'bands',
   //   pattern: ['#FFEE83', '#FFAE70'],
-  //   band: 3,
   //   belly: '#FFF6C9',
   //   ears: { shape: 'pointed', color: '#FFEE83', inner: '#BD6A62' },
   // },
@@ -447,7 +422,6 @@ const SKINS = [
   //   desc: 'Hunts by starlight. Yours.',
   //   mode: 'bands',
   //   pattern: ['#242A6E', '#3D4BC4', '#6FCBFF'],
-  //   band: 2,
   //   scales: { tint: '#A6EEFF' },
   //   ears: { shape: 'pointed', color: '#242A6E', inner: '#6FCBFF' },
   //   eyes: 'slit',
@@ -459,7 +433,6 @@ const SKINS = [
   //   desc: 'Always reaches its destination, whatever the cost.',
   //   mode: 'bands',
   //   pattern: ['#D62828', '#1D3557', '#F4A300', '#1D3557'],
-  //   band: 2,
   //   crown: { shape: 'visor', color: '#1D3557', accent: '#F7D046' },
   // },
   // {
@@ -469,7 +442,6 @@ const SKINS = [
   //   desc: 'Armoured at both ends.',
   //   mode: 'bands',
   //   pattern: ['#6F8B3E', '#5A7433'],
-  //   band: 3,
   //   scales: { tint: '#DCCFA2', style: 'dragon' },
   //   belly: '#CFC48F',
   //   eyes: 'slit',
@@ -515,7 +487,6 @@ const SKINS = [
   //   // and the pale ridge it is what makes the face read, and a deep green head
   //   // just went muddy next to the body.
   //   pattern: ['#2CA04B', '#0F7038', '#63B840', '#2CA04B', '#E9B824'],
-  //   band: 2,
   //   // No tint on purpose. Left automatic, every scale is a lighter version of
   //   // the band it sits on, so the gold bands get gold scutes and the green
   //   // ones green — which is what makes the body read as tiled rather than as

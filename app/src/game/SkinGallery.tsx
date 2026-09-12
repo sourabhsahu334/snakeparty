@@ -100,6 +100,9 @@ export function SkinGallery({
   // or it is cropped by the card border it used to clear.
   const previewSize = Math.min(CARD_W * 0.68, cardArt / ART_ASPECT);
 
+  console.log("skins.length", skins);
+
+
   return (
     <View
       style={{

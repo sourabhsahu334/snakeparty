@@ -19,8 +19,6 @@ export type Skin = {
   mode: 'bands' | 'gradient';
   /** null on 'classic', which wears the player's chosen colour instead. */
   pattern: string[] | null;
-  /** Beads per pattern colour, for 'bands'. */
-  band?: number;
   ears?: { shape: 'round' | 'pointed' | 'long'; color: string; inner?: string };
   /**
    * One head ornament. 'horns' | 'plume' | 'topknot' | 'frill' | 'hat' sit
